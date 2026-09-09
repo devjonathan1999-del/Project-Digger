@@ -11,6 +11,6 @@ func test_conductive_chain(t: TestSupport) -> void:
     var source := Vector2i(0, 1)
     var relay := Vector2i(3, 1)
 
-    t.equal(network.is_connected(model, source, relay), true, "chaîne conductrice relie le relais")
+    t.equal(network.is_relay_connected(model, source, relay), true, "chaîne conductrice relie le relais")
     model.set_cell(Vector2i(2, 1), null)
-    t.equal(network.is_connected(model, source, relay), false, "couper la veine coupe le relais")
+    t.equal(network.is_relay_connected(model, source, relay), false, "couper la veine coupe le relais")
