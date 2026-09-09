@@ -3,7 +3,7 @@ extends Node2D
 @onready var terrain_renderer: TerrainRenderer = $TerrainRenderer
 @onready var game_camera: GameCamera = $GameCamera
 @onready var game_input: GameInput = $GameInput
-@onready var hud: HUD = $HUD
+@onready var hud: DiggerHUD = $HUD
 
 var model: TerrainModel
 var controller: SimulationController
@@ -48,7 +48,7 @@ func _ready() -> void:
     hud.set_energy(controller.cycle_energy)
     hud.set_tool(game_input.active_tool)
     hud.set_relay_connected(controller.relay_connected)
-    hud.set_objective("atteindre la sortie")
+    hud.set_objective_text("Objectif : atteindre la sortie")
 
 func _on_prepare_requested() -> void:
     if controller.enter_prepare():
