@@ -55,7 +55,7 @@ func build() -> Dictionary:
         "relay_source": relay_source,
         "relay_pos": relay_pos,
         "exit_rect": Rect2i(31, 65, 3, 5),
-        "spawn_focus": Vector2(22 * CELL_SIZE, 9 * CELL_SIZE),
+        "spawn_focus": Vector2i(22, 9),
     }
 
 func _fill_rect(model: TerrainModel, rect: Rect2i, material_id: StringName) -> void:
