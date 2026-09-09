@@ -8,6 +8,13 @@ extends Camera2D
 
 var _dragging := false
 
+func set_focus_cell(cell: Vector2i, cell_size: int) -> void:
+    var half_cell := float(cell_size) * 0.5
+    position = Vector2(
+        float(cell.x * cell_size) + half_cell,
+        float(cell.y * cell_size) + half_cell
+    )
+
 func _process(delta: float) -> void:
     var direction := Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")
     if direction != Vector2.ZERO:
@@ -33,7 +40,8 @@ func _unhandled_input(event: InputEvent) -> void:
         return
 
     if _dragging and event is InputEventMouseMotion:
-        position -= event.relative / maxf(zoom.x, 0.01)
+        var motion := event as InputEventMouseMotion
+        position -= motion.relative / maxf(zoom.x, 0.01)
         get_viewport().set_input_as_handled()
 
 func _set_zoom_level(value: float) -> void:
