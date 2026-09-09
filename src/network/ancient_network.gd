@@ -5,7 +5,7 @@ const DIRECTIONS: Array[Vector2i] = [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN,
 
 var _catalog := MaterialCatalog.new()
 
-func is_connected(model: TerrainModel, source: Vector2i, relay: Vector2i) -> bool:
+func is_relay_connected(model: TerrainModel, source: Vector2i, relay: Vector2i) -> bool:
     if not _in_bounds(model, source) or not _in_bounds(model, relay):
         return false
     if source == relay:
