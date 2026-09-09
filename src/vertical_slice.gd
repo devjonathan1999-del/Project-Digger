@@ -10,10 +10,18 @@ var controller: SimulationController
 var _layout_data: Dictionary
 var _stability := StabilitySystem.new()
 var _network := AncientNetwork.new()
+var _save_system := SaveSystem.new()
+var _objective_reached := false
 
 func _ready() -> void:
 	_layout_data = VerticalSliceLayout.new().build()
 	model = _layout_data["model"]
+
+	var saved := _save_system.load_default()
+	if not saved.is_empty():
+		model.restore(saved["terrain"])
+		_objective_reached = bool(saved.get("objective_reached", false))
+
 	controller = SimulationController.new(
 		model,
 		_layout_data["relay_source"],
@@ -44,13 +52,16 @@ func _ready() -> void:
 	hud.undo_pressed.connect(_on_undo_requested)
 	hud.cancel_pressed.connect(_on_cancel_requested)
 
-	hud.set_state(controller.state)
-	hud.set_energy(controller.cycle_energy)
-	hud.set_tool(game_input.active_tool)
-	hud.set_relay_connected(controller.relay_connected)
-	hud.set_objective_text("Objectif : atteindre la sortie")
+	_objective_reached = _objective_reached or _is_exit_open()
+	_refresh_hud()
+
+	if int(saved.get("cycle_state", SimulationController.OBSERVER)) == SimulationController.PREPARE and not _objective_reached:
+		controller.enter_prepare()
+		_refresh_prepare_state()
 
 func _on_prepare_requested() -> void:
+	if _objective_reached:
+		return
 	if controller.enter_prepare():
 		_refresh_prepare_state()
 
@@ -97,6 +108,38 @@ func _on_resolution_finished(movements: Array[Dictionary]) -> void:
 	terrain_renderer.queue_redraw()
 	terrain_renderer.animate_movements(movements)
 	hud.set_relay_connected(controller.relay_connected)
+
+	if _is_exit_open():
+		_objective_reached = true
+	_refresh_hud()
+	_autosave()
+
+func _refresh_hud() -> void:
+	hud.set_state(controller.state)
+	hud.set_energy(controller.cycle_energy)
+	hud.set_tool(game_input.active_tool)
+	hud.set_relay_connected(controller.relay_connected)
+	if _objective_reached:
+		hud.set_objective_text("Accès aux profondeurs ouvert — Vertical slice terminé")
+	else:
+		hud.set_objective_text("Objectif : atteindre la sortie")
+
+func _is_exit_open() -> bool:
+	var exit_rect: Rect2i = _layout_data["exit_rect"]
+	var corridor_x: int = exit_rect.position.x + int(exit_rect.size.x / 2)
+	for y in range(VerticalSliceLayout.GATE_POS.y, exit_rect.end.y):
+		if model.get_cell(Vector2i(corridor_x, y)) != null:
+			return false
+	return true
+
+func _autosave() -> void:
+	var saved := _save_system.save_default(model, {
+		"relay_connected": controller.relay_connected,
+		"cycle_state": controller.state,
+		"objective_reached": _objective_reached,
+	})
+	if not saved:
+		push_error("Project Digger: autosave failed")
 
 func _clear_selection() -> void:
 	var empty: Array[Vector2i] = []
