@@ -2,6 +2,13 @@ class_name SaveSystem
 extends RefCounted
 
 const SAVE_VERSION := 1
+const DEFAULT_PATH := "user://save_v1.json"
+
+func save_default(model: TerrainModel, extra: Dictionary) -> bool:
+    return save_to_path(DEFAULT_PATH, model, extra)
+
+func load_default() -> Dictionary:
+    return load_from_path(DEFAULT_PATH)
 
 func save_to_path(path: String, model: TerrainModel, extra: Dictionary) -> bool:
     if model == null:
