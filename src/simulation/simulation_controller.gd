@@ -48,8 +48,8 @@ func trigger_resolution() -> bool:
     _set_state(RESOLVING)
     var movements := _stability.resolve(_model)
     relay_connected = _network.is_relay_connected(_model, _source, _relay)
-    resolution_finished.emit(movements)
     _set_state(OBSERVER)
+    resolution_finished.emit(movements)
     return true
 
 func cancel_prepare() -> bool:
