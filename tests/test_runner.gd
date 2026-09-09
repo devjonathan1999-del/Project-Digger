@@ -3,6 +3,7 @@ extends SceneTree
 const TEST_SUITES := [
     preload("res://tests/test_material_catalog.gd"),
     preload("res://tests/test_terrain_model.gd"),
+    preload("res://tests/test_terrain_actions.gd"),
 ]
 
 func _initialize() -> void:
