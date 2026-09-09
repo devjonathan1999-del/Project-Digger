@@ -58,10 +58,11 @@ func test_layout_acceptance(t: TestSupport) -> void:
     t.equal(gate_fell, true, "suppression des supports fait tomber la porte dense")
 
     var exit_rect: Rect2i = data["exit_rect"]
+    var corridor_x: int = exit_rect.position.x + int(exit_rect.size.x / 2)
     var corridor_clear := true
-    for y in range(exit_rect.position.y, exit_rect.end.y):
-        if model.get_cell(Vector2i(32, y)) != null:
+    for y in range(VerticalSliceLayout.GATE_POS.y, exit_rect.end.y):
+        if model.get_cell(Vector2i(corridor_x, y)) != null:
             corridor_clear = false
             break
-    t.equal(corridor_clear, true, "corridor vertical vide traverse la zone de sortie")
+    t.equal(corridor_clear, true, "corridor vertical ouvert de la porte jusqu'à la sortie")
     t.equal(network.is_relay_connected(model, data["relay_source"], data["relay_pos"]), true, "solution canonique préserve le relais")
