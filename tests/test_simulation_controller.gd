@@ -30,12 +30,17 @@ func test_resolution_cycle(t: TestSupport) -> void:
     var controller := preload("res://src/simulation/simulation_controller.gd").new(model, Vector2i(0, 4), Vector2i(3, 4), 5)
     var transitions: Array[int] = []
     var resolved_moves: Array = []
+    var finished_states: Array[int] = []
     controller.state_changed.connect(func(value: int) -> void: transitions.append(value))
-    controller.resolution_finished.connect(func(movements: Array[Dictionary]) -> void: resolved_moves.assign(movements))
+    controller.resolution_finished.connect(func(movements: Array[Dictionary]) -> void:
+        resolved_moves.assign(movements)
+        finished_states.append(controller.state)
+    )
 
     controller.enter_prepare()
     t.equal(controller.trigger_resolution(), true, "Déclencher lance la résolution")
     t.equal(controller.state, SimulationController.OBSERVER, "retour Observer après résolution")
     t.equal(transitions, [SimulationController.PREPARE, SimulationController.RESOLVING, SimulationController.OBSERVER], "cycle complet des états")
+    t.equal(finished_states, [SimulationController.OBSERVER], "fin de résolution émise après retour Observer")
     t.check(not resolved_moves.is_empty(), "résolution publie les mouvements")
     t.check(model.get_cell(Vector2i(2, 4)) != null, "effondrement appliqué au modèle")
