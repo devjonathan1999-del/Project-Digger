@@ -5,19 +5,17 @@ Statut : spécification à valider avant implémentation
 
 ## 1. Vision
 
-Project Digger est un jeu 2D en coupe verticale centré sur la manipulation directe du sous-sol. Le joueur ne contrôle pas un mineur : il utilise une technologie ancienne pour creuser, déplacer, fusionner et transformer la matière afin de progresser toujours plus profondément dans un monde persistant.
+Project Digger est un jeu 2D en coupe verticale centré sur la manipulation directe du sous-sol. Le joueur ne contrôle pas un mineur : il utilise une technologie ancienne pour creuser, déplacer, fusionner puis, plus tard, transformer la matière afin de progresser toujours plus profondément dans un monde persistant.
 
-La boucle fondamentale est :
+Boucle fondamentale :
 
 **Observer → Préparer → Déclencher → Résoudre → Exploiter → Descendre**
 
-Le jeu complet visera une progression longue, linéaire et persistante, avec hubs souterrains, chantiers à timers, réseau ancien, logistique, recherche et nouvelles matières. La v0.1 ne cherche pas encore à prouver cette méta-progression : elle doit d’abord prouver que la manipulation du terrain et les réactions sont amusantes.
+Le jeu complet vise une progression longue, linéaire et persistante, avec hubs souterrains, chantiers à timers, réseau ancien, logistique, recherche et nouvelles matières. La v0.1 ne cherche pas encore à prouver cette méta-progression : elle doit d’abord prouver que la manipulation du terrain et les effondrements sont amusants.
 
-## 2. Objectif du vertical slice v0.1
+## 2. Question à valider avec la v0.1
 
-Répondre à une seule question :
-
-> Est-ce que creuser, déplacer et fusionner la matière, préparer un effondrement puis déclencher la simulation produit une boucle de jeu claire, satisfaisante et suffisamment riche pour porter Project Digger ?
+> Est-ce que creuser, déplacer et fusionner la matière, préparer un effondrement puis déclencher la simulation produit une boucle claire, satisfaisante et suffisamment riche pour porter Project Digger ?
 
 La v0.1 doit être jouable de l’entrée d’une caverne jusqu’à une sortie en profondeur.
 
@@ -30,36 +28,38 @@ Une grande caverne 2D semi-ouverte comprenant :
 3. un filon de minerai stabilisant ;
 4. une masse de roche dense impossible à creuser directement ;
 5. un relais ancien à préserver ;
-6. un obstacle final résolu par effondrement contrôlé ;
+6. un obstacle final qui exige de provoquer une modification structurelle importante ;
 7. une sortie vers les profondeurs.
 
-Le joueur doit pouvoir trouver plusieurs manières raisonnables d’aborder l’obstacle final, mais la v0.1 n’a pas besoin d’un bac à sable intégral.
+Le passage final doit être ouvert par l’utilisation de la stabilité et d’un effondrement, mais le choix des supports à retirer, des zones à renforcer et de la manière de préserver le réseau reste ouvert au joueur.
 
 ## 4. États de jeu
 
 ### Observer
 
-Le monde est stable et lisible. Le joueur inspecte les matières, la stabilité structurelle et le réseau ancien.
+Le monde est stable. Le joueur inspecte les matières, la stabilité structurelle et le réseau ancien.
 
 ### Préparer
 
-La simulation principale est suspendue. Le joueur dépense une réserve d’énergie de cycle pour :
+La simulation physique principale est suspendue. Le joueur dispose d’une réserve d’énergie de cycle et peut :
 
 - creuser ;
-- déplacer une masse ;
+- déplacer une masse autorisée ;
 - fusionner des matières compatibles.
 
-Le jeu affiche une prévision partielle : zones stables, fragiles et critiques, continuité du réseau et risques évidents.
+Ces actions modifient un **état préparatoire** et sont annulables tant que le joueur n’a pas déclenché la résolution. Une annulation restitue le coût d’énergie correspondant.
+
+Le jeu affiche une prévision partielle : zones stables, fragiles et critiques, continuité du réseau et risques structurels évidents.
 
 ### Déclencher
 
-Le joueur valide sa préparation. La simulation reprend pour une courte résolution automatique.
+Le joueur valide l’ensemble de la préparation. L’état préparatoire devient l’état logique courant et ne peut plus être annulé.
 
 ### Résoudre
 
-La gravité et les effondrements sont calculés. Les éléments mobiles se stabilisent. Les conséquences restent dans le monde.
+La gravité et les effondrements sont calculés jusqu’à stabilisation ou jusqu’à une limite stricte d’itérations. Les conséquences restent dans le monde.
 
-La v0.1 peut inclure une seule commande d’urgence expérimentale, par exemple « Stabiliser », uniquement si elle améliore réellement la boucle lors des tests.
+**Aucune capacité d’urgence n’est incluse dans la v0.1.** Le système pourra être réévalué après les premiers tests de gameplay.
 
 ## 5. Matières v0.1
 
@@ -79,13 +79,13 @@ La v0.1 peut inclure une seule commande d’urgence expérimentale, par exemple 
 
 - non creusable avec l’outil initial ;
 - forte masse ;
-- utilisée comme obstacle et projectile structurel.
+- sert d’obstacle structurel et peut tomber si ses supports disparaissent.
 
 ### Minerai stabilisant
 
 - ressource fonctionnelle ;
-- peut être fusionnée avec une matière structurelle ;
-- augmente la stabilité de la zone concernée.
+- peut être fusionné avec une matière structurelle ;
+- augmente la résistance locale de la zone fusionnée.
 
 ## 6. Stabilité structurelle
 
@@ -97,13 +97,13 @@ Chaque cellule solide possède au minimum :
 - un état de support ;
 - un état de stabilité calculé.
 
-L’interface traduit la complexité en trois états :
+L’interface traduit le résultat en trois états :
 
 - **Stable** ;
 - **Fragile** ;
 - **Critique**.
 
-La stabilité doit être déterministe dans la v0.1. Le joueur doit pouvoir comprendre après coup pourquoi une masse est tombée.
+La stabilité est déterministe dans la v0.1. À état identique, la résolution doit produire le même résultat. Le joueur doit pouvoir comprendre après coup pourquoi une masse est tombée.
 
 Les effondrements sont des outils de gameplay, pas uniquement des sanctions.
 
@@ -111,46 +111,37 @@ Les effondrements sont des outils de gameplay, pas uniquement des sanctions.
 
 ### Représentation interne
 
-Le terrain repose sur une grille de cellules relativement fines. La grille est l’autorité logique pour les matières, la stabilité, les interactions et la sauvegarde.
+Le terrain repose sur une grille de cellules fines. La grille est l’autorité logique pour les matières, la stabilité, les interactions et la sauvegarde.
 
 ### Rendu
 
-La grille ne doit pas être visuellement dominante. Le rendu utilise des contours, textures et transitions pour donner une apparence organique de coupe géologique.
+La grille ne doit pas être visuellement dominante. Un rendu séparé transforme cet état en coupe géologique organique grâce à des contours, textures et transitions.
 
-Cette séparation permet d’ajouter ultérieurement :
-
-- eau ;
-- gaz ;
-- chaleur ;
-- pression ;
-- conductivité avancée ;
-- réactions chimiques/minérales.
-
-sans remplacer le modèle fondamental du terrain.
+Cette séparation doit permettre d’ajouter plus tard eau, gaz, chaleur, pression, conductivité avancée et réactions minérales sans remplacer le modèle fondamental du terrain.
 
 ## 8. Réseau ancien v0.1
 
-Le vertical slice contient un réseau simplifié :
+Le réseau est volontairement simplifié :
 
 - un relais ancien ;
 - des cellules ou veines conductrices ;
-- une continuité binaire connecté / coupé.
+- une continuité binaire **connecté / coupé**.
 
-Le réseau sert à enseigner que détruire le terrain peut également détruire une infrastructure utile.
+Il sert à enseigner qu’une modification du terrain peut aussi endommager une infrastructure utile.
 
-La capacité, surcharge, puissance et transport de matière sont hors périmètre v0.1.
+Capacité, surcharge, puissance, transport de matière et amplification sont hors périmètre v0.1.
 
 ## 9. Énergie de cycle
 
-En phase Préparer, chaque action consomme une énergie abstraite.
+En Préparer, chaque action valide consomme une énergie abstraite.
 
 Objectifs :
 
-- empêcher le joueur de remodeler toute la caverne sans arbitrage ;
-- créer des décisions locales ;
+- empêcher le remodelage illimité de la caverne ;
+- créer des arbitrages locaux ;
 - préfigurer la future économie énergétique.
 
-Les valeurs exactes sont des paramètres de gameplay et doivent rester faciles à modifier.
+Une action invalide ne consomme rien. Les coûts sont data-driven et modifiables sans changer la logique des actions.
 
 ## 10. Interface
 
@@ -158,11 +149,13 @@ Direction : **sci-fi minéral stylisé**, équilibrant atmosphère et lisibilit�
 
 HUD minimal :
 
-- état actuel : Observer / Préparer / Déclencher ;
+- état actuel ;
 - énergie restante ;
 - outil actif ;
 - état du relais ;
-- objectif de profondeur.
+- objectif de profondeur ;
+- commande Annuler pendant Préparer ;
+- commande Déclencher.
 
 Mode d’analyse en Préparer :
 
@@ -171,7 +164,7 @@ Mode d’analyse en Préparer :
 - continuité du réseau ;
 - prévision partielle.
 
-Les informations techniques détaillées ne sont pas affichées en permanence.
+Les données techniques détaillées ne sont pas affichées en permanence.
 
 ## 11. Caméra et contrôles
 
@@ -179,130 +172,127 @@ Vue 2D latérale en coupe verticale.
 
 Pour le prototype :
 
-- navigation caméra au clavier/souris ;
+- navigation caméra clavier/souris ;
 - zoom ;
 - sélection directe du terrain ;
-- gestes conçus de façon à pouvoir être adaptés au tactile plus tard.
+- commandes pensées pour être adaptables au tactile.
 
-Le support mobile complet n’est pas un objectif v0.1 ; l’architecture d’entrée ne doit toutefois pas dépendre exclusivement d’un clic droit, d’un survol ou d’un clavier.
+Le support mobile complet n’est pas un objectif v0.1. La couche d’entrée ne doit toutefois pas dépendre exclusivement d’un clic droit, d’un survol ou d’un clavier.
 
 ## 12. Sauvegarde
 
 La v0.1 sauvegarde au minimum :
 
-- état de chaque cellule modifiée ;
-- position des masses déplacées ;
+- état validé des cellules ;
+- masses déplacées et stabilisées ;
 - état du relais ;
-- énergie ou état de cycle pertinent ;
+- état du cycle ;
 - progression jusqu’à la sortie.
 
-Format versionné dès le départ pour permettre l’évolution du modèle de données.
+Un état préparatoire non déclenché n’a pas besoin d’être restauré après fermeture du jeu : la sauvegarde correspond au dernier état validé.
 
-## 13. Architecture logique proposée
+Le format est versionné dès la première version.
+
+## 13. Architecture logique
 
 ### TerrainModel
-
 Autorité sur les cellules et leurs propriétés.
 
 ### MaterialCatalog
-
-Définitions data-driven des matières. Les nouvelles matières doivent pouvoir être ajoutées sans modifier le cœur du moteur de terrain.
+Définitions data-driven des matières.
 
 ### StabilitySystem
-
-Calcule les supports, zones fragiles et effondrements potentiels.
+Calcule support, stabilité, prévision et résolution structurelle.
 
 ### TerrainActions
+API unique pour Creuser, Déplacer et Fusionner. Valide les actions et leurs coûts.
 
-API unique pour Creuser, Déplacer et Fusionner. Les coûts d’énergie sont centralisés ici.
+### PreparationState
+Copie de travail ou journal de modifications représentant les actions non encore déclenchées. Permet l’annulation avant validation.
 
 ### SimulationController
-
-Gère les états Observer / Préparer / Déclencher / Résoudre et orchestre la résolution.
+Gère Observer / Préparer / Déclencher / Résoudre et orchestre la résolution.
 
 ### AncientNetwork
-
 Calcule la continuité du réseau v0.1.
 
 ### SaveSystem
-
-Sérialise l’état logique, indépendamment du rendu.
+Sérialise uniquement l’état logique validé.
 
 ### TerrainRenderer
-
-Transforme l’état logique de la grille en représentation visuelle organique.
+Transforme le TerrainModel en représentation visuelle organique.
 
 ### HUD
+Présente cycle, énergie, outils, réseau et informations d’analyse.
 
-Affiche l’état du cycle, l’énergie, l’outil, le réseau et les informations d’analyse.
-
-Les systèmes communiquent par interfaces/signaux explicites ; aucun système visuel ne doit devenir l’autorité sur les règles de gameplay.
+Les systèmes communiquent par interfaces ou signaux explicites. Aucun composant visuel ne devient l’autorité sur les règles de gameplay.
 
 ## 14. Flux principal
 
-1. Chargement de la caverne et de son TerrainModel.
-2. Observer : lecture libre.
-3. Passage en Préparer.
-4. TerrainActions modifie l’état préparatoire et consomme l’énergie.
+1. Chargement du TerrainModel validé.
+2. Observer : inspection libre.
+3. Passage en Préparer et création du PreparationState.
+4. TerrainActions valide et applique les modifications au PreparationState.
 5. StabilitySystem produit la prévision partielle.
-6. Déclencher valide l’état préparé.
-7. SimulationController exécute la résolution.
-8. TerrainModel devient le nouvel état persistant.
-9. AncientNetwork recalcule la continuité.
-10. Sauvegarde.
-11. Retour à Observer ou validation de la sortie.
+6. Le joueur peut annuler une ou plusieurs actions.
+7. Déclencher valide le PreparationState.
+8. SimulationController lance la résolution structurelle déterministe.
+9. TerrainModel reçoit le nouvel état stabilisé.
+10. AncientNetwork recalcule la continuité.
+11. SaveSystem écrit l’état validé.
+12. Retour à Observer ou validation de la sortie.
 
-## 15. Gestion des erreurs et règles de sécurité gameplay
+## 15. Règles de robustesse
 
-- Une action invalide ne consomme pas d’énergie.
-- Une masse impossible à déplacer indique clairement pourquoi.
-- Le joueur ne peut pas déclencher un état corrompu ou incomplet.
-- Une simulation doit avoir une limite stricte d’itérations pour éviter une boucle infinie d’effondrements.
-- Les sauvegardes sont écrites de manière atomique ou via fichier temporaire avant remplacement.
-- En cas de sauvegarde incompatible, le jeu ne doit pas silencieusement charger des données partielles.
+- Une action invalide n’altère ni terrain ni énergie.
+- Une masse impossible à déplacer explique visuellement la cause.
+- La résolution possède une limite stricte d’itérations.
+- Les sauvegardes sont écrites atomiquement ou via fichier temporaire avant remplacement.
+- Une sauvegarde incompatible n’est jamais chargée partiellement en silence.
+- Une erreur de rendu ne doit pas modifier l’état logique du terrain.
 
 ## 16. Tests v0.1
 
 Tests automatisés prioritaires :
 
-- définition et chargement des matières ;
-- coût et validation des actions ;
+- chargement des définitions de matières ;
+- validation et coût des actions ;
+- annulation d’une action préparée ;
 - calcul de support simple ;
-- transition Stable → Fragile → Critique ;
+- transitions Stable → Fragile → Critique ;
 - effondrement déterministe d’un cas connu ;
 - fusion avec minerai stabilisant ;
-- continuité / rupture du réseau ;
-- sérialisation puis restauration du TerrainModel ;
-- transitions d’état de SimulationController.
+- continuité puis rupture du réseau ;
+- sérialisation/restauration du TerrainModel ;
+- transitions du SimulationController.
 
 Tests de jeu manuels :
 
-- comprendre comment ouvrir le passage sans explication externe ;
+- comprendre comment ouvrir le passage sans documentation externe ;
 - identifier visuellement un risque d’effondrement ;
 - réussir volontairement un effondrement ;
 - provoquer une erreur et comprendre sa cause ;
-- ressentir une différence utile entre creuser, déplacer et fusionner.
+- ressentir une utilité distincte pour Creuser, Déplacer et Fusionner ;
+- vouloir retenter la caverne avec une autre préparation.
 
 ## 17. Critères de réussite
 
 La v0.1 est validée si :
 
-1. la boucle Observer → Préparer → Déclencher est compréhensible ;
+1. Observer → Préparer → Déclencher est compris sans tutoriel lourd ;
 2. provoquer un effondrement volontaire est satisfaisant ;
-3. le joueur peut expliquer les conséquences majeures de ses actions ;
-4. préserver ou couper le réseau crée un vrai arbitrage ;
+3. les conséquences majeures restent explicables ;
+4. préserver ou couper le réseau crée un arbitrage ;
 5. Creuser, Déplacer et Fusionner ont chacun une utilité ;
-6. l’état du terrain persiste correctement après sauvegarde/rechargement ;
-7. le prototype donne envie de rejouer la caverne avec une autre approche.
+6. le terrain persiste correctement après sauvegarde/rechargement ;
+7. la caverne donne envie d’être rejouée avec une autre approche.
 
-Si ces critères ne sont pas remplis, les systèmes de timers, hubs et progression longue ne doivent pas être développés avant correction du cœur de jeu.
+Si ces critères ne sont pas remplis, timers, hubs et progression longue ne sont pas développés avant correction du cœur de jeu.
 
 ## 18. Hors périmètre v0.1
 
-Explicitement reportés :
-
 - timers réels et progression hors ligne ;
-- colonies/hubs évolutifs ;
+- hubs/colonies évolutifs ;
 - logistique inter-hubs ;
 - raffineries et files de production ;
 - eau, gaz, vapeur, chaleur et pression ;
@@ -310,28 +300,31 @@ Explicitement reportés :
 - génération procédurale complète ;
 - PNJ et narration développée ;
 - arbres de technologie ;
+- capacité d’urgence pendant Résoudre ;
 - monétisation ;
 - endgame ;
 - multijoueur.
 
 ## 19. Direction long terme à préserver
 
-Même si la v0.1 est volontairement réduite, son architecture ne doit pas empêcher la vision validée :
+L’architecture de la v0.1 ne doit pas empêcher :
 
 - campagne linéaire de longue durée ;
 - monde vertical persistant ;
 - grandes strates semi-ouvertes ;
 - hubs/colonies spécialisés et interconnectés ;
-- projets à timers avec progression hors connexion ;
-- aucune attente bloquant tout le jeu ;
-- nouveaux pouvoirs principalement fonctionnels plutôt que bonus chiffrés ;
+- projets à timers et progression hors connexion ;
+- timers bloquant une branche mais jamais tout le jeu ;
+- accélération des timers obtenue par le gameplay ;
+- nouvelles fonctions plutôt que simples bonus chiffrés ;
 - matières cumulatives et réactions émergentes ;
+- réseau ancien fragile, limité et dépendant des matériaux ;
 - technologie ancienne géométrique fusionnée au monde minéral ;
-- progression visuelle forte des infrastructures ;
+- évolution visuelle forte des infrastructures ;
 - échec local transformant le monde sans reset de campagne.
 
-## 20. Hypothèse à confirmer pendant le prototype
+## 20. Hypothèse de plateforme pour le prototype
 
-Le prototype sera développé d’abord pour ordinateur afin d’itérer rapidement, tout en gardant une couche d’entrée compatible avec une future adaptation tactile/mobile.
+Le prototype sera d’abord développé pour ordinateur afin d’itérer rapidement, tout en gardant une couche d’entrée compatible avec une future adaptation tactile/mobile.
 
-Cette hypothèse peut être changée sans remettre en cause le modèle de terrain ou les règles du vertical slice.
+Cette hypothèse peut être modifiée sans remettre en cause le TerrainModel, le système de stabilité ou la boucle de simulation.
