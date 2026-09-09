@@ -29,7 +29,7 @@ func _init(
     _relay = relay
     cycle_energy = maxi(0, p_cycle_energy)
     if _model != null:
-        relay_connected = _network.is_connected(_model, _source, _relay)
+        relay_connected = _network.is_relay_connected(_model, _source, _relay)
 
 func enter_prepare() -> bool:
     if state != OBSERVER or _model == null:
@@ -47,7 +47,7 @@ func trigger_resolution() -> bool:
     energy_changed.emit(terrain_actions.energy_remaining)
     _set_state(RESOLVING)
     var movements := _stability.resolve(_model)
-    relay_connected = _network.is_connected(_model, _source, _relay)
+    relay_connected = _network.is_relay_connected(_model, _source, _relay)
     resolution_finished.emit(movements)
     _set_state(OBSERVER)
     return true
