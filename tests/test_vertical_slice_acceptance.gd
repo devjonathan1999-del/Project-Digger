@@ -11,6 +11,7 @@ func test_layout_acceptance(t: TestSupport) -> void:
 
     t.equal(model.width, 64, "largeur vertical slice")
     t.equal(model.height, 72, "hauteur vertical slice")
+    t.equal(data["spawn_focus"], Vector2i(22, 9), "spawn focus reste en coordonnées de cellule")
 
     var entrance_has_diggable := false
     for y in range(4, 13):
@@ -39,7 +40,7 @@ func test_layout_acceptance(t: TestSupport) -> void:
     t.equal(dense_found, true, "obstacle dense non creusable présent")
 
     var network := preload("res://src/network/ancient_network.gd").new()
-    t.equal(network.is_connected(model, data["relay_source"], data["relay_pos"]), true, "relais connecté au départ")
+    t.equal(network.is_relay_connected(model, data["relay_source"], data["relay_pos"]), true, "relais connecté au départ")
 
     var actions := preload("res://src/terrain/terrain_actions.gd").new()
     actions.begin_prepare(model, 10)
@@ -63,4 +64,4 @@ func test_layout_acceptance(t: TestSupport) -> void:
             corridor_clear = false
             break
     t.equal(corridor_clear, true, "corridor vertical vide traverse la zone de sortie")
-    t.equal(network.is_connected(model, data["relay_source"], data["relay_pos"]), true, "solution canonique préserve le relais")
+    t.equal(network.is_relay_connected(model, data["relay_source"], data["relay_pos"]), true, "solution canonique préserve le relais")
