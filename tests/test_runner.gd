@@ -4,6 +4,7 @@ const TEST_SUITES := [
     preload("res://tests/test_material_catalog.gd"),
     preload("res://tests/test_terrain_model.gd"),
     preload("res://tests/test_terrain_actions.gd"),
+    preload("res://tests/test_stability_system.gd"),
 ]
 
 func _initialize() -> void:
