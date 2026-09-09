@@ -44,19 +44,11 @@ func _ready() -> void:
 	hud.undo_pressed.connect(_on_undo_requested)
 	hud.cancel_pressed.connect(_on_cancel_requested)
 
-<<<<<<< Updated upstream
-    hud.set_state(controller.state)
-    hud.set_energy(controller.cycle_energy)
-    hud.set_tool(game_input.active_tool)
-    hud.set_relay_connected(controller.relay_connected)
-    hud.set_objective_text("Objectif : atteindre la sortie")
-=======
 	hud.set_state(controller.state)
 	hud.set_energy(controller.cycle_energy)
 	hud.set_tool(game_input.active_tool)
 	hud.set_relay_connected(controller.relay_connected)
-	hud.set_objective("atteindre la sortie")
->>>>>>> Stashed changes
+	hud.set_objective_text("Objectif : atteindre la sortie")
 
 func _on_prepare_requested() -> void:
 	if controller.enter_prepare():
