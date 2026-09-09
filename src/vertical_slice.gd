@@ -1,14 +1,12 @@
-class_name VerticalSlice
 extends Node2D
 
 @onready var terrain_renderer: TerrainRenderer = $TerrainRenderer
 @onready var game_camera: GameCamera = $GameCamera
 @onready var game_input: GameInput = $GameInput
-@onready var hud: DiggerHUD = $HUD
+@onready var hud: HUD = $HUD
 
 var model: TerrainModel
 var controller: SimulationController
-
 var _layout_data: Dictionary
 var _stability := StabilitySystem.new()
 var _network := AncientNetwork.new()
@@ -24,8 +22,12 @@ func _ready() -> void:
     )
 
     terrain_renderer.set_model(model)
-    game_camera.position = _layout_data["spawn_focus"]
+    game_camera.set_focus_cell(_layout_data["spawn_focus"], TerrainRenderer.CELL_SIZE)
     game_input.configure(terrain_renderer)
+
+    controller.state_changed.connect(_on_state_changed)
+    controller.energy_changed.connect(hud.set_energy)
+    controller.resolution_finished.connect(_on_resolution_finished)
 
     game_input.dig_requested.connect(_on_dig_requested)
     game_input.move_requested.connect(_on_move_requested)
@@ -42,35 +44,29 @@ func _ready() -> void:
     hud.undo_pressed.connect(_on_undo_requested)
     hud.cancel_pressed.connect(_on_cancel_requested)
 
-    controller.state_changed.connect(_on_state_changed)
-    controller.energy_changed.connect(hud.set_energy)
-    controller.resolution_finished.connect(_on_resolution_finished)
-
     hud.set_state(controller.state)
     hud.set_energy(controller.cycle_energy)
     hud.set_tool(game_input.active_tool)
     hud.set_relay_connected(controller.relay_connected)
-    hud.set_objective_text("Objectif : atteindre la sortie")
+    hud.set_objective("atteindre la sortie")
 
 func _on_prepare_requested() -> void:
     if controller.enter_prepare():
         _refresh_prepare_state()
 
 func _on_trigger_requested() -> void:
-    _clear_selection()
-    controller.trigger_resolution()
-
-func _on_cancel_requested() -> void:
-    _clear_selection()
-    if controller.cancel_prepare():
-        terrain_renderer.queue_redraw()
-        hud.set_relay_connected(controller.relay_connected)
+    if controller.trigger_resolution():
+        _clear_selection()
 
 func _on_undo_requested() -> void:
-    if controller.state != SimulationController.PREPARE:
-        return
-    if controller.terrain_actions.undo():
+    if controller.state == SimulationController.PREPARE and controller.terrain_actions.undo():
         _refresh_prepare_state()
+
+func _on_cancel_requested() -> void:
+    if controller.cancel_prepare():
+        _clear_selection()
+        terrain_renderer.queue_redraw()
+        hud.set_relay_connected(controller.relay_connected)
 
 func _on_dig_requested(cell: Vector2i) -> void:
     if controller.state == SimulationController.PREPARE and controller.terrain_actions.dig(cell):
@@ -88,7 +84,7 @@ func _refresh_prepare_state() -> void:
     terrain_renderer.set_analysis(_stability.classify(model))
     terrain_renderer.queue_redraw()
     hud.set_energy(controller.terrain_actions.energy_remaining)
-    hud.set_relay_connected(_network.is_connected(model, _layout_data["relay_source"], _layout_data["relay_pos"]))
+    hud.set_relay_connected(_network.is_relay_connected(model, _layout_data["relay_source"], _layout_data["relay_pos"]))
 
 func _on_state_changed(value: int) -> void:
     hud.set_state(value)
