@@ -10,6 +10,7 @@ signal undo_requested
 signal cancel_requested
 signal tool_changed(tool: StringName)
 signal selection_changed(cells: Array[Vector2i])
+signal hover_changed(cell: Vector2i)
 
 var active_tool: StringName = &"dig"
 var _renderer: TerrainRenderer
@@ -29,6 +30,9 @@ func set_active_tool(tool: StringName) -> void:
     tool_changed.emit(active_tool)
 
 func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventMouseMotion and _renderer != null:
+        hover_changed.emit(_renderer.cell_from_screen(event.position))
+
     if event.is_action_pressed("tool_dig"):
         set_active_tool(&"dig")
         return
