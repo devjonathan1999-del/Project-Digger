@@ -42,6 +42,10 @@ func test_collapse_is_deterministic(t: TestSupport) -> void:
     var first_moves := system.resolve(first)
     var second_moves := system.resolve(second)
     t.equal(first_moves, second_moves, "même terrain produit mêmes mouvements")
+    t.check(not first_moves.is_empty(), "effondrement produit des mouvements")
+    if not first_moves.is_empty():
+        t.check(first_moves[0].has("material_id"), "mouvement expose la matière pour le feedback")
+        t.equal(first_moves[0].get("material_id", &""), &"rock_common", "matière du mouvement conservée")
     t.equal(first.get_cell(Vector2i(1, 4)).material_id, &"rock_common", "bloc finit sur le fond")
 
 func test_iteration_limit(t: TestSupport) -> void:
