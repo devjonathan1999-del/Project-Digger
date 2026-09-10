@@ -1,14 +1,19 @@
 extends RefCounted
 
+const SAVE_PATH := "user://project_digger_v02_acceptance.json"
+
 func run(t: TestSupport) -> void:
     test_layout_acceptance(t)
+    _cleanup()
 
 func test_layout_acceptance(t: TestSupport) -> void:
+    _cleanup()
     var layout := preload("res://src/content/vertical_slice_layout.gd").new()
     var data := layout.build()
     var model: TerrainModel = data["model"]
     var catalog := preload("res://src/core/material_catalog.gd").new()
 
+    t.equal(VerticalSliceLayout.CONTENT_ID, "cave_v02_helix_01", "identifiant contenu v0.2 stable")
     t.equal(model.width, 64, "largeur cave v0.2")
     t.equal(model.height, 72, "hauteur cave v0.2")
 
@@ -92,10 +97,34 @@ func test_layout_acceptance(t: TestSupport) -> void:
 
     var exit_rect: Rect2i = data["exit_rect"]
     var corridor_x: int = exit_rect.position.x + int(exit_rect.size.x / 2)
-    var corridor_clear := true
-    for y in range(VerticalSliceLayout.GATE_POS.y, exit_rect.end.y):
-        if model.get_cell(Vector2i(corridor_x, y)) != null:
-            corridor_clear = false
-            break
-    t.equal(corridor_clear, true, "corridor vertical ouvert de la porte jusqu'à la sortie")
+    t.equal(_is_corridor_clear(model, corridor_x, exit_rect.end.y), true, "corridor vertical ouvert de la porte jusqu'à la sortie")
     t.equal(network.is_relay_connected(model, data["relay_source"], data["relay_pos"]), true, "solution canonique préserve le relais")
+
+    var save := preload("res://src/save/save_system.gd").new()
+    t.equal(save.save_to_path(SAVE_PATH, model, {
+        "relay_connected": true,
+        "cycle_state": SimulationController.OBSERVER,
+        "objective_reached": true,
+        "content_id": VerticalSliceLayout.CONTENT_ID,
+    }), true, "cave résolue sauvegardée")
+
+    var loaded := save.load_from_path_for_content(SAVE_PATH, VerticalSliceLayout.CONTENT_ID)
+    t.equal(loaded.is_empty(), false, "cave v0.2 résolue rechargée par content_id")
+    if loaded.is_empty():
+        return
+
+    var fresh_data := layout.build()
+    var restored: TerrainModel = fresh_data["model"]
+    restored.restore(loaded["terrain"])
+    t.equal(_is_corridor_clear(restored, corridor_x, exit_rect.end.y), true, "descente reste ouverte après restauration")
+    t.equal(network.is_relay_connected(restored, fresh_data["relay_source"], fresh_data["relay_pos"]), true, "relais reste connecté après restauration")
+
+func _is_corridor_clear(model: TerrainModel, corridor_x: int, end_y: int) -> bool:
+    for y in range(VerticalSliceLayout.GATE_POS.y, end_y):
+        if model.get_cell(Vector2i(corridor_x, y)) != null:
+            return false
+    return true
+
+func _cleanup() -> void:
+    if FileAccess.file_exists(SAVE_PATH):
+        DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
