@@ -2,7 +2,9 @@ extends Node2D
 
 const VisualProfile := preload("res://src/view/terrain_visual_profile.gd")
 
+@onready var cave_backdrop = $CaveBackdrop
 @onready var terrain_renderer: TerrainRenderer = $TerrainRenderer
+@onready var ancient_overlay = $AncientOverlay
 @onready var game_camera: GameCamera = $GameCamera
 @onready var game_input: GameInput = $GameInput
 @onready var hud: DiggerHUD = $HUD
@@ -34,7 +36,10 @@ func _ready() -> void:
 		6
 	)
 
+	cave_backdrop.configure(Vector2i(model.width, model.height), TerrainRenderer.CELL_SIZE)
 	terrain_renderer.set_model(model)
+	ancient_overlay.configure(_layout_data["ancient_path"], _layout_data["relay_pos"], TerrainRenderer.CELL_SIZE)
+	ancient_overlay.set_connected(controller.relay_connected)
 	game_camera.set_focus_cell(_layout_data["spawn_focus"], TerrainRenderer.CELL_SIZE)
 	game_input.configure(terrain_renderer)
 
@@ -85,6 +90,7 @@ func _on_cancel_requested() -> void:
 		_clear_selection()
 		terrain_renderer.queue_redraw()
 		hud.set_relay_connected(controller.relay_connected)
+		ancient_overlay.set_connected(controller.relay_connected)
 
 func _on_dig_requested(cell: Vector2i) -> void:
 	if controller.state == SimulationController.PREPARE and controller.terrain_actions.dig(cell):
@@ -148,7 +154,9 @@ func _refresh_prepare_state() -> void:
 	terrain_renderer.set_analysis(_stability.classify(model))
 	terrain_renderer.queue_redraw()
 	hud.set_energy(controller.terrain_actions.energy_remaining)
-	hud.set_relay_connected(_network.is_relay_connected(model, _layout_data["relay_source"], _layout_data["relay_pos"]))
+	var relay_connected := _network.is_relay_connected(model, _layout_data["relay_source"], _layout_data["relay_pos"])
+	hud.set_relay_connected(relay_connected)
+	ancient_overlay.set_connected(relay_connected)
 	_refresh_hover_context()
 
 func _on_state_changed(value: int) -> void:
@@ -165,6 +173,7 @@ func _on_resolution_finished(movements: Array[Dictionary]) -> void:
 	terrain_renderer.queue_redraw()
 	terrain_renderer.animate_movements(movements)
 	hud.set_relay_connected(controller.relay_connected)
+	ancient_overlay.set_connected(controller.relay_connected)
 
 	if _is_exit_open():
 		_objective_reached = true
@@ -176,6 +185,7 @@ func _refresh_hud() -> void:
 	hud.set_energy(controller.cycle_energy)
 	hud.set_tool(game_input.active_tool)
 	hud.set_relay_connected(controller.relay_connected)
+	ancient_overlay.set_connected(controller.relay_connected)
 	terrain_renderer.set_prepare_mode(controller.state == SimulationController.PREPARE)
 	if _objective_reached:
 		hud.set_objective_text("Accès aux profondeurs ouvert — Vertical slice terminé")
