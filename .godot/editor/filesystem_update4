@@ -9,3 +9,6 @@ res://tests/test_runner.gd
 res://tests/test_save_system.gd
 res://tests/test_stability_system.gd
 res://tests/test_vertical_slice_acceptance.gd
+res://src/view/cave_backdrop.gd
+res://src/view/game_camera.gd
+res://tests/test_scene_contract.gd
