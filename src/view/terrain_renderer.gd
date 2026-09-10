@@ -50,6 +50,9 @@ func analysis_visible_for(pos: Vector2i) -> bool:
             return true
     return false
 
+func observer_fill_color(_pos: Vector2i, material_id: StringName) -> Color:
+    return VisualProfile.base_color(material_id)
+
 func cell_from_local(local_pos: Vector2) -> Vector2i:
     return Vector2i(
         int(floor(local_pos.x / float(CELL_SIZE))),
@@ -90,7 +93,7 @@ func _draw() -> void:
 
             var polygon := _cell_polygon(pos)
             var variant: int = VisualProfile.detail_variant(pos, cell.material_id)
-            var base: Color = VisualProfile.base_color(cell.material_id).lightened(float(variant) * 0.012)
+            var base: Color = observer_fill_color(pos, cell.material_id)
             draw_colored_polygon(polygon, base)
             _draw_material_detail(pos, cell.material_id, variant)
             _draw_exposed_edges(pos, polygon)
