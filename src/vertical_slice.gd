@@ -1,5 +1,7 @@
 extends Node2D
 
+const VisualProfile := preload("res://src/view/terrain_visual_profile.gd")
+
 @onready var terrain_renderer: TerrainRenderer = $TerrainRenderer
 @onready var game_camera: GameCamera = $GameCamera
 @onready var game_input: GameInput = $GameInput
@@ -11,7 +13,10 @@ var _layout_data: Dictionary
 var _stability := StabilitySystem.new()
 var _network := AncientNetwork.new()
 var _save_system := SaveSystem.new()
+var _catalog := MaterialCatalog.new()
 var _objective_reached := false
+var _last_hovered_cell := Vector2i.ZERO
+var _has_hovered_cell := false
 
 func _ready() -> void:
 	_layout_data = VerticalSliceLayout.new().build()
@@ -44,13 +49,15 @@ func _ready() -> void:
 	game_input.trigger_requested.connect(_on_trigger_requested)
 	game_input.undo_requested.connect(_on_undo_requested)
 	game_input.cancel_requested.connect(_on_cancel_requested)
-	game_input.tool_changed.connect(hud.set_tool)
+	game_input.tool_changed.connect(_on_tool_changed)
 	game_input.selection_changed.connect(terrain_renderer.set_selection)
+	game_input.hover_changed.connect(_on_hover_changed)
 
 	hud.prepare_pressed.connect(_on_prepare_requested)
 	hud.trigger_pressed.connect(_on_trigger_requested)
 	hud.undo_pressed.connect(_on_undo_requested)
 	hud.cancel_pressed.connect(_on_cancel_requested)
+	hud.tool_pressed.connect(game_input.set_active_tool)
 
 	_objective_reached = _objective_reached or _is_exit_open()
 	_refresh_hud()
@@ -91,18 +98,68 @@ func _on_fuse_requested(target: Vector2i, source: Vector2i) -> void:
 	if controller.state == SimulationController.PREPARE and controller.terrain_actions.fuse(target, source):
 		_refresh_prepare_state()
 
+func _on_tool_changed(tool: StringName) -> void:
+	hud.set_tool(tool)
+	_refresh_hover_context()
+
+func _on_hover_changed(cell: Vector2i) -> void:
+	if cell.x < 0 or cell.y < 0 or cell.x >= model.width or cell.y >= model.height:
+		_has_hovered_cell = false
+		terrain_renderer.clear_hovered_cell()
+		hud.clear_context()
+		return
+
+	_last_hovered_cell = cell
+	_has_hovered_cell = true
+	terrain_renderer.set_hovered_cell(cell)
+	_refresh_hover_context()
+
+func _refresh_hover_context() -> void:
+	if not _has_hovered_cell or controller.state != SimulationController.PREPARE:
+		hud.clear_context()
+		return
+
+	var terrain_cell := model.get_cell(_last_hovered_cell)
+	if terrain_cell == null:
+		hud.clear_context()
+		return
+
+	var material := _catalog.get_def(terrain_cell.material_id)
+	var actionable := false
+	var cost := 0
+	var action_name := ""
+	match game_input.active_tool:
+		&"dig":
+			action_name = "Creuser"
+			cost = TerrainActions.DIG_COST
+			actionable = material != null and material.diggable and controller.terrain_actions.energy_remaining >= cost
+		&"move":
+			action_name = "Déplacer"
+			cost = TerrainActions.MOVE_COST
+			actionable = controller.terrain_actions.energy_remaining >= cost
+		&"fuse":
+			action_name = "Fusionner"
+			cost = TerrainActions.FUSE_COST
+			actionable = controller.terrain_actions.energy_remaining >= cost
+
+	hud.set_context(VisualProfile.display_name(terrain_cell.material_id), action_name, cost, actionable)
+
 func _refresh_prepare_state() -> void:
 	terrain_renderer.set_analysis(_stability.classify(model))
 	terrain_renderer.queue_redraw()
 	hud.set_energy(controller.terrain_actions.energy_remaining)
 	hud.set_relay_connected(_network.is_relay_connected(model, _layout_data["relay_source"], _layout_data["relay_pos"]))
+	_refresh_hover_context()
 
 func _on_state_changed(value: int) -> void:
 	hud.set_state(value)
+	terrain_renderer.set_prepare_mode(value == SimulationController.PREPARE)
 	if value == SimulationController.PREPARE:
 		terrain_renderer.set_analysis(_stability.classify(model))
+		_refresh_hover_context()
 	else:
 		terrain_renderer.set_analysis({})
+		hud.clear_context()
 
 func _on_resolution_finished(movements: Array[Dictionary]) -> void:
 	terrain_renderer.queue_redraw()
@@ -119,10 +176,11 @@ func _refresh_hud() -> void:
 	hud.set_energy(controller.cycle_energy)
 	hud.set_tool(game_input.active_tool)
 	hud.set_relay_connected(controller.relay_connected)
+	terrain_renderer.set_prepare_mode(controller.state == SimulationController.PREPARE)
 	if _objective_reached:
 		hud.set_objective_text("Accès aux profondeurs ouvert — Vertical slice terminé")
 	else:
-		hud.set_objective_text("Objectif : atteindre la sortie")
+		hud.set_objective_text("Objectif : ouvrir la descente")
 
 func _is_exit_open() -> bool:
 	var exit_rect: Rect2i = _layout_data["exit_rect"]
