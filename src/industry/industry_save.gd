@@ -99,7 +99,8 @@ func _finish_load(candidate, saved_at: float, logical_now: float) -> Dictionary:
 
 func _new_result(saved_at_unix: float, error: String) -> Dictionary:
     var game = IndustryGameScript.new()
-    game.world_seed = _seed_from(saved_at_unix)
+    if error == "":
+        game.world_seed = _seed_from(saved_at_unix)
     return {
         "game": game,
         "saved_at_unix": saved_at_unix,
