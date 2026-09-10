@@ -2,6 +2,16 @@ class_name IndustryDiscovery
 extends RefCounted
 
 const Catalog = preload("res://src/industry/industry_catalog.gd")
+const OPTIONAL_DISCOVERY_CHANCE := 0.35
+
+static func should_generate(seed: int, depth: int, slot: int) -> bool:
+    if depth < 30 or depth % 10 != 0:
+        return false
+    if Catalog.MILESTONES.has(depth) and str(Catalog.MILESTONES[depth].get("guaranteed_pocket", "")) != "":
+        return true
+    var rng := RandomNumberGenerator.new()
+    rng.seed = hash([seed, depth, slot, "presence"])
+    return rng.randf() < OPTIONAL_DISCOVERY_CHANCE
 
 static func generate(seed: int, depth: int, slot: int, quality_floor: float) -> Dictionary:
     var rng := RandomNumberGenerator.new()
