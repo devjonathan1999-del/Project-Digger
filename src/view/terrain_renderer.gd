@@ -107,16 +107,35 @@ func _has_cell(pos: Vector2i) -> bool:
 
 func _cell_polygon(pos: Vector2i) -> PackedVector2Array:
     var origin := Vector2(pos.x * CELL_SIZE, pos.y * CELL_SIZE)
-    var top: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.TOP) if not _has_cell(pos + Vector2i.UP) else 0.0
-    var right: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.RIGHT) if not _has_cell(pos + Vector2i.RIGHT) else 0.0
-    var bottom: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.BOTTOM) if not _has_cell(pos + Vector2i.DOWN) else 0.0
-    var left: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.LEFT) if not _has_cell(pos + Vector2i.LEFT) else 0.0
+    var top_exposed := not _has_cell(pos + Vector2i.UP)
+    var right_exposed := not _has_cell(pos + Vector2i.RIGHT)
+    var bottom_exposed := not _has_cell(pos + Vector2i.DOWN)
+    var left_exposed := not _has_cell(pos + Vector2i.LEFT)
+
+    var top: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.TOP) if top_exposed else 0.0
+    var right: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.RIGHT) if right_exposed else 0.0
+    var bottom: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.BOTTOM) if bottom_exposed else 0.0
+    var left: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.LEFT) if left_exposed else 0.0
+
+    var top_mid := top + (float(_surface_wobble(pos, 1)) if top_exposed else 0.0)
+    var right_mid := right + (float(_surface_wobble(pos, 2)) if right_exposed else 0.0)
+    var bottom_mid := bottom + (float(_surface_wobble(pos, 3)) if bottom_exposed else 0.0)
+    var left_mid := left + (float(_surface_wobble(pos, 4)) if left_exposed else 0.0)
+
     return PackedVector2Array([
         origin + Vector2(left, top),
+        origin + Vector2(CELL_SIZE * 0.5, top_mid),
         origin + Vector2(CELL_SIZE - right, top),
+        origin + Vector2(CELL_SIZE - right_mid, CELL_SIZE * 0.5),
         origin + Vector2(CELL_SIZE - right, CELL_SIZE - bottom),
+        origin + Vector2(CELL_SIZE * 0.5, CELL_SIZE - bottom_mid),
         origin + Vector2(left, CELL_SIZE - bottom),
+        origin + Vector2(left_mid, CELL_SIZE * 0.5),
     ])
+
+func _surface_wobble(pos: Vector2i, salt: int) -> int:
+    var value := abs(pos.x * 92821 + pos.y * 68917 + salt * 283)
+    return value % 3
 
 func _draw_outline(polygon: PackedVector2Array, color: Color, width: float) -> void:
     if polygon.is_empty():
@@ -128,13 +147,13 @@ func _draw_outline(polygon: PackedVector2Array, color: Color, width: float) -> v
 func _draw_exposed_edges(pos: Vector2i, polygon: PackedVector2Array) -> void:
     var shade := Color(0.02, 0.035, 0.045, 0.48)
     if not _has_cell(pos + Vector2i.UP):
-        draw_line(polygon[0], polygon[1], shade, 1.4, true)
+        draw_polyline(PackedVector2Array([polygon[0], polygon[1], polygon[2]]), shade, 1.4, true)
     if not _has_cell(pos + Vector2i.RIGHT):
-        draw_line(polygon[1], polygon[2], shade, 1.4, true)
+        draw_polyline(PackedVector2Array([polygon[2], polygon[3], polygon[4]]), shade, 1.4, true)
     if not _has_cell(pos + Vector2i.DOWN):
-        draw_line(polygon[2], polygon[3], shade, 1.4, true)
+        draw_polyline(PackedVector2Array([polygon[4], polygon[5], polygon[6]]), shade, 1.4, true)
     if not _has_cell(pos + Vector2i.LEFT):
-        draw_line(polygon[3], polygon[0], shade, 1.4, true)
+        draw_polyline(PackedVector2Array([polygon[6], polygon[7], polygon[0]]), shade, 1.4, true)
 
 func _draw_material_detail(pos: Vector2i, material_id: StringName, variant: int) -> void:
     var origin := Vector2(pos.x * CELL_SIZE, pos.y * CELL_SIZE)
