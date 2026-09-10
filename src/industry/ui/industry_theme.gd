@@ -7,6 +7,12 @@ const ACCENT := Color("52dcc5")
 const COPPER := Color("f0b272")
 const TEXT := Color("eff4ef")
 const MUTED := Color("9eb3c5")
+const ROCK_SHALLOW := Color("343b40")
+const ROCK_DENSE := Color("252f38")
+const ROCK_CRYSTAL := Color("1b2933")
+const ROCK_DEEP := Color("14212b")
+const INDUSTRIAL_AMBER := Color("d59758")
+const CRYSTAL_CYAN := Color("44d9d2")
 
 static func panel(color: Color = PANEL, border: Color = Color("294052"), padding: int = 16) -> StyleBoxFlat:
     var style := StyleBoxFlat.new()
