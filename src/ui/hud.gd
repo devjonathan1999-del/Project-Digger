@@ -33,11 +33,11 @@ func _ready() -> void:
     status_panel.offset_left = 16
     status_panel.offset_top = 16
     status_panel.offset_right = -16
-    status_panel.offset_bottom = 62
+    status_panel.offset_bottom = 60
     status_panel.add_theme_stylebox_override("panel", _panel_style())
     root.add_child(status_panel)
 
-    var status_margin := _margin_container(12, 8)
+    var status_margin := _margin_container(12, 7)
     status_panel.add_child(status_margin)
     var status_row := HBoxContainer.new()
     status_row.add_theme_constant_override("separation", 18)
@@ -53,43 +53,57 @@ func _ready() -> void:
     _objective_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
     _context_panel = PanelContainer.new()
-    _context_panel.position = Vector2(16, 72)
-    _context_panel.custom_minimum_size = Vector2(250, 52)
+    _context_panel.position = Vector2(16, 70)
+    _context_panel.custom_minimum_size = Vector2(238, 48)
     _context_panel.add_theme_stylebox_override("panel", _panel_style())
     _context_panel.visible = false
     root.add_child(_context_panel)
-    var context_margin := _margin_container(10, 7)
+    var context_margin := _margin_container(9, 6)
     _context_panel.add_child(context_margin)
     _context_label = _make_label(context_margin, "")
 
+    # Keep the centre-bottom of the cave clear. Tools live on the left and
+    # state actions on the right so the descent remains visible.
     var tool_panel := PanelContainer.new()
-    tool_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-    tool_panel.offset_left = -440
-    tool_panel.offset_top = -74
-    tool_panel.offset_right = 440
-    tool_panel.offset_bottom = -16
+    tool_panel.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+    tool_panel.offset_left = 16
+    tool_panel.offset_top = -62
+    tool_panel.offset_right = 334
+    tool_panel.offset_bottom = -14
     tool_panel.add_theme_stylebox_override("panel", _panel_style())
     root.add_child(tool_panel)
 
-    var tool_margin := _margin_container(10, 8)
+    var tool_margin := _margin_container(7, 6)
     tool_panel.add_child(tool_margin)
     var tool_row := HBoxContainer.new()
     tool_row.alignment = BoxContainer.ALIGNMENT_CENTER
-    tool_row.add_theme_constant_override("separation", 7)
+    tool_row.add_theme_constant_override("separation", 5)
     tool_margin.add_child(tool_row)
 
-    _tool_buttons[&"dig"] = _make_tool_button(tool_row, "1  Creuser", &"dig")
-    _tool_buttons[&"move"] = _make_tool_button(tool_row, "2  Déplacer", &"move")
-    _tool_buttons[&"fuse"] = _make_tool_button(tool_row, "3  Fusionner", &"fuse")
+    _tool_buttons[&"dig"] = _make_tool_button(tool_row, "1 Creuser", &"dig")
+    _tool_buttons[&"move"] = _make_tool_button(tool_row, "2 Déplacer", &"move")
+    _tool_buttons[&"fuse"] = _make_tool_button(tool_row, "3 Fusionner", &"fuse")
 
-    var separator := VSeparator.new()
-    separator.custom_minimum_size.x = 8
-    tool_row.add_child(separator)
+    var action_panel := PanelContainer.new()
+    action_panel.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+    action_panel.offset_left = -334
+    action_panel.offset_top = -62
+    action_panel.offset_right = -16
+    action_panel.offset_bottom = -14
+    action_panel.add_theme_stylebox_override("panel", _panel_style())
+    root.add_child(action_panel)
 
-    _prepare_button = _make_button(tool_row, "Préparer", func() -> void: prepare_pressed.emit())
-    _trigger_button = _make_button(tool_row, "Déclencher", func() -> void: trigger_pressed.emit())
-    _cancel_button = _make_button(tool_row, "Annuler", func() -> void: cancel_pressed.emit())
-    _undo_button = _make_button(tool_row, "Undo", func() -> void: undo_pressed.emit())
+    var action_margin := _margin_container(7, 6)
+    action_panel.add_child(action_margin)
+    var action_row := HBoxContainer.new()
+    action_row.alignment = BoxContainer.ALIGNMENT_CENTER
+    action_row.add_theme_constant_override("separation", 5)
+    action_margin.add_child(action_row)
+
+    _prepare_button = _make_button(action_row, "Préparer", func() -> void: prepare_pressed.emit())
+    _trigger_button = _make_button(action_row, "Déclencher", func() -> void: trigger_pressed.emit())
+    _cancel_button = _make_button(action_row, "Annuler", func() -> void: cancel_pressed.emit())
+    _undo_button = _make_button(action_row, "Undo", func() -> void: undo_pressed.emit())
 
     _refresh_tool_state()
     _refresh_buttons()
@@ -153,8 +167,8 @@ func _make_label(parent: Control, text: String) -> Label:
 func _make_button(parent: Control, text: String, callback: Callable) -> Button:
     var button := Button.new()
     button.text = text
-    button.custom_minimum_size = Vector2(108, 38)
-    button.add_theme_font_size_override("font_size", 13)
+    button.custom_minimum_size = Vector2(94, 34)
+    button.add_theme_font_size_override("font_size", 12)
     button.add_theme_stylebox_override("normal", _button_style(Color("#13212a"), Color(0.22, 0.47, 0.54, 0.65)))
     button.add_theme_stylebox_override("hover", _button_style(Color("#19313a"), Color(0.35, 0.72, 0.76, 0.85)))
     button.add_theme_stylebox_override("pressed", _button_style(Color("#17434a"), Color("#61d4cf")))
@@ -190,8 +204,8 @@ func _button_style(background: Color, border: Color) -> StyleBoxFlat:
     style.border_color = border
     style.set_border_width_all(1)
     style.set_corner_radius_all(5)
-    style.content_margin_left = 10
-    style.content_margin_right = 10
+    style.content_margin_left = 8
+    style.content_margin_right = 8
     return style
 
 func _refresh_tool_state() -> void:
