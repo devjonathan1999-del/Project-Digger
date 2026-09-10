@@ -33,7 +33,7 @@ La boucle cible est :
 4. choisir entre amélioration industrielle, exploration latérale et préparation du prochain forage ;
 5. lancer un forage vers le prochain palier ;
 6. atteindre une nouvelle profondeur ;
-7. révéler un contenu : ressource, contrainte, site, technologie ou événement ;
+7. révéler un contenu : contrainte, site, technologie ou événement ;
 8. adapter l'exploitation ;
 9. recommencer.
 
@@ -58,24 +58,24 @@ La mine possède un **axe vertical principal continu**. La caméra peut se dépl
 
 Les profondeurs sont découpées en :
 
-- **pas de forage** : petites descentes régulières, initialement 10 m ;
-- **grands paliers** : tous les 30 m dans le réglage initial ;
+- **pas de forage** : petites descentes régulières de 10 m ;
+- **grands paliers** : tous les 30 m pour la v0.3 ;
 - **zones géologiques** : groupes de plusieurs paliers avec identité visuelle et mécanique propre.
 
 Chaque grand palier garantit une nouveauté importante. Entre deux grands paliers, des découvertes secondaires peuvent apparaître.
 
-Exemple de progression initiale à tester :
+### Contenu minimal de progression v0.3
 
-| Profondeur | Rôle principal |
+| Profondeur | Déblocage garanti |
 | --- | --- |
-| 0–30 m | industrie de base : fer, charbon, cuivre |
-| 30 m | première nouveauté de ressource / recette |
-| 60 m | première contrainte de forage ou amélioration requise |
-| 90 m | accès à une ressource ou branche technologique avancée |
-| 120 m | première découverte ancienne majeure |
-| 150 m | nouveau biome souterrain clairement distinct |
+| 0–20 m | industrie v0.2 et tutoriel de la vue verticale |
+| 30 m | première poche latérale épuisable + Centre niveau 2 disponible |
+| 60 m | strate de roche dense + Centre niveau 3 disponible ; foreuse niveau 2 requise pour dépasser ce palier |
+| 90 m | spécialisations + 1 Point technologique garanti + Centre niveau 4 disponible + première cavité cristalline possible |
+| 120 m | structure ancienne majeure + 1 Point technologique garanti + Centre niveau 5 disponible |
+| 150 m | nouveau biome profond + 1 Point technologique garanti + Centre niveau 6 disponible |
 
-Les contenus précis de ces paliers peuvent évoluer pendant l'équilibrage, mais la règle « un grand palier = une nouveauté visible ou mécanique » est obligatoire.
+Le contenu au-delà de 150 m n'est pas requis pour valider la v0.3. La profondeur peut rester techniquement extensible.
 
 ## Poches latérales
 
@@ -129,26 +129,37 @@ La branche **Exploration** améliore progressivement la qualité minimale des r�
 
 Toute génération aléatoire persistante doit utiliser une graine enregistrée ou stocker directement le résultat généré.
 
+## Ressource profonde minimale
+
+La v0.3 ajoute une seule ressource profonde obligatoire au catalogue : `crystal` / **Cristal brut**.
+
+Elle apparaît à partir de 90 m dans les cavités cristallines permanentes. Une cavité cristalline coûte 2 points de capacité lorsqu'elle est active et produit lentement du cristal brut.
+
+Le cristal brut sert aux coûts de construction des améliorations technologiques de rang supérieur et prépare les versions futures. La progression principale jusqu'à 150 m ne doit cependant jamais dépendre d'un tirage aléatoire de cavité : le premier accès à une cavité cristalline doit être garanti par la seed de progression ou par un site de palier dédié.
+
+Aucune autre nouvelle ressource n'est requise pour la v0.3.
+
 ## Événements temporaires
 
 Deux sources d'événements temporaires sont prévues :
 
 1. événements déclenchés par un forage ou une nouvelle profondeur ;
-2. événements pouvant apparaître pendant que l'exploitation fonctionne.
+2. événements pouvant apparaître pendant une session active lorsque l'exploitation fonctionne.
 
 Un événement temporaire doit demander un **petit choix stratégique**, pas un simple bouton de collecte.
 
-Exemple : un filon instable peut être affecté pendant quelques minutes à l'une de plusieurs ressources, avec un bénéfice différent selon le choix.
+Premier événement obligatoire : **Filon instable**. Il propose d'affecter le bonus au fer, au cuivre ou au charbon. Le choix augmente fortement le débit de la ressource choisie pendant quelques minutes. Les valeurs exactes restent data-driven.
 
-Les événements :
+Règles :
 
-- ne doivent jamais bloquer la partie ;
-- ne doivent pas punir le joueur s'il ne les voit pas ;
-- peuvent expirer ;
-- doivent avoir un état sauvegardé avec heure de début et de fin ;
-- doivent rester rares assez pour être remarquables.
+- un événement ne bloque jamais la partie ;
+- un événement non vu ne doit jamais pénaliser le joueur ;
+- les événements ambiants aléatoires ne sont générés que pendant une session active ;
+- un événement produit par un travail terminé hors ligne est mis en attente et son timer commence uniquement lorsqu'il est présenté au joueur ;
+- un événement déjà présenté peut expirer normalement ;
+- début, fin, choix et état de présentation sont sauvegardés.
 
-La fréquence exacte n'est pas figée dans la spec et devra être calibrée en jeu.
+La fréquence exacte doit être calibrée en jeu et n'est pas un critère de progression.
 
 ## Capacité d'exploitation
 
@@ -156,16 +167,22 @@ Digger utilise une seule ressource abstraite : **Capacité d'exploitation**.
 
 Elle représente globalement l'énergie, les équipes et la logistique sans les simuler séparément.
 
-Réglage initial :
+Tous les sites permanents restent construits, mais seuls les sites actifs consomment de la capacité et produisent leurs effets. Le joueur peut désactiver un site et réaffecter sa capacité. Une désactivation ne détruit aucune progression du site.
 
-- départ : **3 points de capacité** ;
-- un petit site permanent coûte généralement 1 point ;
-- un site avancé coûte généralement 2 points ;
-- les sites exceptionnels peuvent coûter 3 points.
+### Paliers du Centre
 
-Tous les sites permanents restent construits, mais seuls les sites actifs consomment de la capacité et produisent leurs effets.
+| Centre | Profondeur requise | Capacité de base |
+| --- | ---: | ---: |
+| Niveau 1 | 0 m | 3 |
+| Niveau 2 | 30 m | 4 |
+| Niveau 3 | 60 m | 5 |
+| Niveau 4 | 90 m | 6 |
+| Niveau 5 | 120 m | 7 |
+| Niveau 6 | 150 m | 8 |
 
-Le joueur peut désactiver un site et réaffecter sa capacité. Une désactivation ne détruit aucune progression du site.
+Le coût exact d'amélioration du Centre reste dans le catalogue et doit augmenter avec le niveau en utilisant les ressources industrielles déjà disponibles.
+
+Un petit site permanent coûte généralement 1 point, un site avancé 2 points et un site exceptionnel 3 points.
 
 ## Centre d'exploitation
 
@@ -175,67 +192,55 @@ La profondeur débloque le droit d'augmenter la capacité, mais l'amélioration 
 
 Le modèle est donc :
 
-`profondeur atteinte → nouveau plafond débloqué → amélioration du Centre → capacité réellement disponible`
+`profondeur atteinte → niveau de Centre autorisé → achat de l'amélioration → capacité réellement disponible`
 
-Les premiers niveaux sont linéaires et faciles à comprendre. Ils servent principalement à augmenter la capacité globale.
-
-À partir d'un palier de progression intermédiaire, initialement autour de 90–120 m, le Centre débloque trois spécialisations.
+Les premiers niveaux sont linéaires. Au niveau 4 / 90 m, le Centre donne accès aux spécialisations.
 
 ## Spécialisations
 
-Trois branches sont prévues.
+Trois branches sont prévues et restent **cumulables**.
 
 ### Production
 
-Améliore l'économie principale :
-
-- débit d'extraction ;
-- durée de fabrication ;
-- efficacité de certaines installations.
+Premier effet v0.3 : **Production I** augmente de 10 % les débits d'extraction bruts.
 
 ### Logistique
 
-Améliore l'exploitation simultanée :
-
-- capacité globale ;
-- coût en capacité de certains sites ;
-- flexibilité d'activation des sites.
+Premier effet v0.3 : **Logistique I** ajoute 1 point permanent de capacité d'exploitation au-delà de la capacité fournie par le Centre.
 
 ### Exploration
 
-Améliore la progression et les découvertes :
+Premier effet v0.3 : **Exploration I** relève de 20 % le plancher de qualité utilisé lors du calcul des récompenses variables d'une poche. Une récompense garde donc sa plage et sa part de hasard, mais les résultats les plus faibles deviennent impossibles.
 
-- durée de certaines explorations ;
-- qualité minimale des récompenses semi-aléatoires ;
-- qualité ou fréquence contrôlée de certaines découvertes rares.
+Ces trois technologies constituent le minimum obligatoire de la v0.3. L'architecture doit permettre d'ajouter des rangs suivants sans modifier les sauvegardes existantes.
 
-Les trois branches sont **cumulables**. Aucune décision ne ferme définitivement les autres branches.
+## Branche prioritaire
 
-Le joueur choisit cependant une **branche prioritaire**. Cette priorité procure un avantage de progression, par exemple coût inférieur ou progression technologique accélérée. La valeur exacte doit rester data-driven afin de pouvoir être équilibrée.
+Le joueur choisit une branche prioritaire parmi Production, Logistique et Exploration.
 
-La priorité peut être changée ; la v0.3 ne doit pas imposer de respec punitif.
+La priorité donne un bonus passif distinct des technologies achetées :
+
+- priorité Production : +10 % supplémentaires aux débits bruts ;
+- priorité Logistique : +1 point de capacité tant que cette priorité est active ;
+- priorité Exploration : +20 % supplémentaires au plancher de qualité des récompenses variables.
+
+Changer de priorité ne rembourse ni ne retire aucune technologie. Le changement est gratuit mais déclenche un délai de **5 minutes** avant qu'un nouveau changement soit autorisé. Le cooldown est sauvegardé et continue hors ligne.
+
+Cette règle évite de changer de priorité avant chaque clic tout en permettant de réorienter une partie sans respec punitif.
 
 ## Points technologiques
 
 Une amélioration technologique nécessite deux conditions :
 
-1. un **Point technologique** pour débloquer le savoir ;
+1. **1 Point technologique** pour débloquer le savoir ;
 2. des ressources industrielles pour construire/appliquer l'amélioration.
 
 Les points technologiques viennent de deux sources :
 
-- certains grands paliers de profondeur : récompenses garanties suffisantes pour suivre la progression normale ;
+- grands paliers de profondeur : 1 point garanti à 90 m, 120 m et 150 m ;
 - certaines poches latérales importantes : points supplémentaires récompensant l'exploration.
 
-Le joueur qui ignore toutes les poches latérales doit pouvoir terminer la progression principale. L'exploration donne plus de flexibilité et permet d'accélérer ou diversifier les spécialisations.
-
-## Ressources et contenu
-
-La v0.3 conserve le noyau `iron`, `coal`, `copper`, `iron_ingot`, `copper_ingot`, `cable` de la v0.2.
-
-De nouvelles ressources peuvent être introduites à certains grands paliers, mais leur nombre doit rester faible dans une première implémentation. La priorité est de prouver la progression et les systèmes, pas de remplir artificiellement un catalogue.
-
-Une nouvelle ressource doit obligatoirement avoir au moins un usage clair : recette, amélioration, exploration ou technologie.
+Les points de palier suffisent pour construire au moins une amélioration dans chacune des trois branches. Le joueur qui ignore toutes les poches latérales doit pouvoir suivre la progression principale. L'exploration donne plus de flexibilité et prépare les rangs futurs.
 
 ## Carte et caméra
 
@@ -277,9 +282,9 @@ Affichage compact des ressources et états principaux :
 - Cuivre ;
 - Charbon ;
 - Capacité utilisée / totale ;
-- profondeur actuelle/maximale pertinente.
+- profondeur.
 
-Les ressources avancées ne doivent pas toutes saturer la barre supérieure. Elles peuvent être regroupées dans les panneaux spécialisés.
+Les ressources avancées ne doivent pas toutes saturer la barre supérieure. Le cristal brut apparaît dans Industrie/Technologie et dans les panneaux concernés.
 
 ### Navigation basse
 
@@ -374,9 +379,7 @@ La transition doit être progressive. Digger ne devient pas brutalement un unive
 
 ## Architecture logique proposée
 
-La v0.3 doit prolonger la séparation déjà utilisée dans la v0.2 : modèle déterministe, session/horloge, sauvegarde, rendu.
-
-Composants logiques à introduire ou étendre :
+La v0.3 prolonge la séparation de la v0.2 : modèle déterministe, session/horloge, sauvegarde, rendu.
 
 ### `IndustryCatalog`
 
@@ -389,7 +392,8 @@ Devient le catalogue data-driven des :
 - types de poches ;
 - technologies ;
 - spécialisations ;
-- coûts de capacité.
+- coûts de capacité ;
+- événements et bonus.
 
 Les valeurs d'équilibrage ne doivent pas être dispersées dans l'UI.
 
@@ -399,40 +403,43 @@ Reste propriétaire de l'état économique déterministe et ajoute :
 
 - capacité totale et utilisée ;
 - niveau du Centre ;
-- profondeur/paliers débloqués ;
+- paliers débloqués et récompenses de palier réclamées ;
 - sites permanents ;
 - poches découvertes ;
 - explorations en cours ;
-- événements actifs ;
+- événements actifs/en attente ;
 - points technologiques ;
 - technologies débloquées/construites ;
-- branche prioritaire.
-
-### Génération de découvertes
-
-Un composant logique dédié peut générer les poches depuis :
-
-- profondeur ;
-- identifiant/palier ;
+- branche prioritaire et cooldown de changement ;
 - seed persistante de partie.
 
-Il doit produire des résultats reproductibles et sérialisables.
+### `IndustryDiscovery`
+
+Composant logique sans UI chargé de générer une découverte depuis :
+
+- seed de partie ;
+- profondeur ;
+- emplacement/slot de découverte ;
+- type de zone.
+
+Le même triplet logique doit toujours produire le même résultat. Une fois une poche créée, son résultat complet est sérialisé et devient la source de vérité.
 
 ### `IndustrySession`
 
-Continue de gérer le temps réel et hors ligne. Elle doit faire avancer :
+Continue de gérer le temps réel et hors ligne. Elle fait avancer :
 
 - production ;
 - lots ;
 - forage ;
 - exploration ;
-- événements temporaires.
+- événements déjà présentés ;
+- cooldown de priorité.
 
 Un grand saut de temps doit donner le même état logique que plusieurs petits sauts équivalents.
 
 ### Vue mine
 
-La vue doit être séparée du modèle. Elle transforme l'état en :
+La vue transforme l'état en :
 
 - profondeur ;
 - couches géologiques ;
@@ -445,17 +452,22 @@ Aucune ressource ne doit être créée directement par une animation ou un callb
 
 ## Sauvegarde et migration
 
-La v0.3 doit charger une sauvegarde industrielle v0.2 existante sans perte de progression.
+La sauvegarde industrielle passe à un schéma v2 tout en conservant le même fichier logique `user://industry_v1.json` pour éviter deux progressions concurrentes.
 
-Le schéma de sauvegarde doit être versionné. À la première ouverture v0.3 :
+La v0.3 doit charger une sauvegarde v0.2/schema v1 existante sans perte de progression.
+
+À la première migration :
 
 - ressources, niveaux de mines, niveau de foreuse, profondeur et travaux v0.2 sont conservés ;
-- les nouveaux systèmes sont initialisés à leurs valeurs par défaut cohérentes avec la profondeur existante ;
-- aucune découverte v0.3 ne doit être dupliquée lors des réouvertures suivantes.
+- `center_level` démarre à 1 ;
+- le niveau maximal du Centre immédiatement achetable est calculé depuis la profondeur déjà atteinte ;
+- les améliorations de Centre ne sont pas offertes automatiquement ;
+- les Points technologiques garantis correspondant aux seuils déjà dépassés sont crédités une seule fois et les récompenses de palier sont marquées comme réclamées ;
+- la seed de partie est créée une seule fois puis sauvegardée ;
+- les poches correspondant aux profondeurs déjà explorées sont générées une seule fois depuis cette seed ;
+- aucune technologie ni priorité n'est choisie automatiquement.
 
-Les règles de sauvegarde atomique de la v0.2 restent obligatoires.
-
-Une sauvegarde invalide reste préservée et la session provisoire ne l'écrase pas.
+Les règles de sauvegarde atomique de la v0.2 restent obligatoires. Une sauvegarde invalide reste préservée et la session provisoire ne l'écrase pas.
 
 ## Gestion des erreurs
 
@@ -466,10 +478,12 @@ Le modèle doit refuser sans mutation partielle :
 - site inconnu ;
 - poche déjà exploitée ;
 - technologie non débloquée ;
-- point technologique manquant ;
+- Point technologique manquant ;
 - profondeur insuffisante ;
+- niveau de Centre non autorisé ;
 - données de découverte incohérentes ;
-- état de timer invalide.
+- état de timer invalide ;
+- changement de priorité pendant le cooldown.
 
 L'UI traduit le motif de refus en message court et actionnable.
 
@@ -480,20 +494,24 @@ L'UI traduit le motif de refus en message court et actionnable.
 - activation/désactivation de sites et calcul de capacité ;
 - refus atomique si capacité insuffisante ;
 - progression du Centre et verrou par profondeur ;
-- obtention de points technologiques ;
+- obtention de Points technologiques ;
 - déblocage puis construction d'une technologie ;
-- branche prioritaire sans verrou des autres branches ;
+- trois technologies initiales et trois bonus de priorité ;
+- cooldown de priorité ;
 - génération reproductible des poches ;
 - résultat d'une poche inchangé après sauvegarde/rechargement ;
 - poche épuisable ;
 - site permanent ;
+- production de cristal ;
 - qualité minimale modifiée par Exploration ;
-- événement temporaire, expiration et choix ;
+- événement Filon instable, choix et expiration ;
+- événement issu d'un travail hors ligne mis en attente sans expiration invisible ;
 - avancement par gros saut = avancement fractionné.
 
 ### Persistance
 
-- migration d'une sauvegarde v0.2 ;
+- migration d'une sauvegarde v0.2/schema v1 ;
+- attribution rétroactive unique des Points technologiques de palier ;
 - sauvegarde/reprise d'une exploration active ;
 - sauvegarde/reprise d'un événement temporaire ;
 - absence hors ligne terminant plusieurs types de travaux ;
@@ -524,12 +542,14 @@ La v0.3 est considérée comme réussie si un nouveau joueur peut, sans outil de
 3. voir au moins une découverte latérale ;
 4. choisir de l'explorer avec ressources + temps ;
 5. transformer au moins une découverte en bénéfice permanent ou ponctuel ;
-6. atteindre un palier qui débloque une amélioration du Centre ;
-7. augmenter sa capacité et activer un site supplémentaire ;
-8. obtenir un point technologique ;
-9. débloquer puis construire une amélioration de spécialisation ;
-10. quitter puis revenir sans perdre ni dupliquer production, travaux, événements ou découvertes ;
-11. comprendre son exploitation principalement depuis la vue verticale de la mine.
+6. atteindre 90 m et débloquer le système technologique ;
+7. améliorer le Centre et augmenter sa capacité ;
+8. activer/désactiver des sites selon cette capacité ;
+9. obtenir un Point technologique ;
+10. choisir une branche prioritaire puis construire une technologie ;
+11. rencontrer ou déclencher le premier événement stratégique ;
+12. quitter puis revenir sans perdre ni dupliquer production, travaux, événements ou découvertes ;
+13. comprendre son exploitation principalement depuis la vue verticale de la mine.
 
 Le parcours doit contenir plusieurs décisions utiles en moins de dix minutes lors du début de partie. Les timers plus longs doivent apparaître progressivement et laisser d'autres actions disponibles.
 
@@ -546,17 +566,18 @@ Le parcours doit contenir plusieurs décisions utiles en moins de dix minutes lo
 - monétisation ;
 - timers obligatoires de plusieurs heures ;
 - arbre technologique massif ;
-- dizaines de nouvelles ressources ;
+- plus d'une nouvelle ressource profonde obligatoire ;
 - génération procédurale infinie de contenu unique.
 
-## Décision de production
+## Ordre de production
 
-La v0.3 doit être construite par tranches jouables. La priorité est :
+La v0.3 doit être construite par tranches jouables :
 
-1. structure de profondeur et découvertes ;
-2. sites permanents + capacité + Centre ;
-3. technologie et spécialisations ;
-4. événements temporaires ;
-5. vue verticale/HUD final et enrichissement visuel.
+1. **profondeur + paliers + génération persistante des découvertes** ;
+2. **poches + sites permanents + capacité + Centre** ;
+3. **Points technologiques + spécialisations + priorité** ;
+4. **événement Filon instable + règles offline** ;
+5. **vue verticale interactive + HUD final** ;
+6. **animations et enrichissement visuel modulaire**.
 
-Le graphisme final doit viser la composition validée : mine verticale dominante, surface industrielle crédible, interface sombre et propre, mystère visuel croissant dans les profondeurs. La première implémentation doit privilégier des assets modulaires réutilisables plutôt que tenter immédiatement le niveau de détail d'une illustration conceptuelle unique.
+Le graphisme final vise la composition validée : mine verticale dominante, surface industrielle crédible, interface sombre et propre, mystère visuel croissant dans les profondeurs. La première implémentation doit privilégier des assets modulaires réutilisables plutôt que tenter immédiatement le niveau de détail d'une illustration conceptuelle unique.
