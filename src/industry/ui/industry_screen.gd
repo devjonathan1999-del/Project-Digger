@@ -3,7 +3,8 @@ extends Control
 
 const Catalog = preload("res://src/industry/industry_catalog.gd")
 const Style = preload("res://src/industry/ui/industry_theme.gd")
-const Overview = preload("res://src/industry/ui/mine_overview.gd")
+const MineWorldScript = preload("res://src/industry/ui/mine_world.gd")
+const SitePanelScript = preload("res://src/industry/ui/site_panel.gd")
 const IndustryPanelScript = preload("res://src/industry/ui/industry_panel.gd")
 const CenterPanelScript = preload("res://src/industry/ui/center_panel.gd")
 const TechnologyPanelScript = preload("res://src/industry/ui/technology_panel.gd")
@@ -13,11 +14,14 @@ var _wallet: Dictionary = {}
 var _wallet_grid: GridContainer
 var _content_host: VBoxContainer
 var _mine_panel: VBoxContainer
+var _mine_layout: BoxContainer
+var _mine_world
+var _site_panel
+var _milestone_buttons: Dictionary = {}
 var _industry_panel
 var _center_panel
 var _technology_panel
 var _depth: Label
-var _overview: Control
 var _drill_info: Label
 var _drill_cost: Label
 var _drill_upgrade: Button
@@ -129,25 +133,53 @@ func _build_mine_panel() -> void:
     _mine_panel = VBoxContainer.new()
     _mine_panel.name = "MinePanel"
     _mine_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _mine_panel.add_theme_constant_override("separation", 14)
+    _mine_panel.add_theme_constant_override("separation", 12)
     _content_host.add_child(_mine_panel)
     _label(_mine_panel, "MINE", 22)
-    _label(_mine_panel, "Descends par horizons de 10 m et ouvre de nouveaux paliers.", 14, Style.MUTED)
-    var row := BoxContainer.new()
-    row.name = "MineColumns"
-    row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    row.add_theme_constant_override("separation", 16)
-    _mine_panel.add_child(row)
+    _label(_mine_panel, "Fais glisser la coupe verticale, sélectionne un élément et ouvre de nouveaux horizons.", 14, Style.MUTED)
 
-    var survey := _card(row)
-    survey.custom_minimum_size.x = 280
-    _label(survey, "COUPE DU SOUS-SOL", 14, Style.MUTED)
-    _overview = Overview.new()
-    survey.add_child(_overview)
+    var camera_row := HBoxContainer.new()
+    camera_row.name = "MineCameraShortcuts"
+    camera_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _mine_panel.add_child(camera_row)
+    var surface := _button(camera_row, "Surface", "FocusSurface")
+    surface.pressed.connect(_focus_depth.bind(0))
+    var drill_focus := _button(camera_row, "Foreuse", "FocusDrill")
+    drill_focus.pressed.connect(_focus_drill)
+    for milestone in [30, 60, 90, 120, 150]:
+        var focus := _button(camera_row, "%d m" % milestone, "Focus%d" % milestone)
+        focus.pressed.connect(_focus_depth.bind(milestone))
+        _milestone_buttons[milestone] = focus
 
-    var drill := _card(row)
-    _label(drill, "Foreuse", 20)
-    _drill_info = _label(drill, "", 14, Style.MUTED)
+    _mine_layout = BoxContainer.new()
+    _mine_layout.name = "MineWorldLayout"
+    _mine_layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _mine_layout.add_theme_constant_override("separation", 14)
+    _mine_panel.add_child(_mine_layout)
+
+    var world_card := PanelContainer.new()
+    world_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    world_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    world_card.add_theme_stylebox_override("panel", Style.panel(Color("0d1821"), Color("294052"), 6))
+    _mine_layout.add_child(world_card)
+    _mine_world = MineWorldScript.new()
+    world_card.add_child(_mine_world)
+    _mine_world.bind_session(session)
+    _mine_world.selection_changed.connect(_on_world_selection)
+
+    var side := VBoxContainer.new()
+    side.name = "MineSidePanel"
+    side.custom_minimum_size.x = 280
+    side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    side.add_theme_constant_override("separation", 12)
+    _mine_layout.add_child(side)
+
+    _site_panel = SitePanelScript.new()
+    side.add_child(_site_panel)
+
+    var drill := _card(side)
+    _label(drill, "COMMANDES FOREUSE", 14, Style.MUTED)
+    _drill_info = _label(drill, "", 16)
     _drill_cost = _label(drill, "", 13, Style.COPPER)
     _drill_upgrade = _button(drill, "Améliorer la foreuse", "DrillUpgrade")
     _drill_upgrade.pressed.connect(_upgrade_drill)
@@ -172,7 +204,9 @@ func _select_view(view_id: String) -> void:
     _technology_panel.visible = view_id == "technology"
     for id in _tabs:
         _tabs[id].disabled = id == view_id
-    if view_id == "industry":
+    if view_id == "mine":
+        _mine_world.refresh()
+    elif view_id == "industry":
         _industry_panel.refresh()
     elif view_id == "center":
         _center_panel.refresh()
@@ -200,10 +234,26 @@ func _refresh() -> void:
         _dig_progress.value = _percent(game.jobs["drill"])
     else:
         _dig_info.text = "Chantier disponible · +10 m" if reason == "" else reason
-    _overview.set_progress(game.depth, game.drill_level, game.jobs.get("drill", {}))
+    _refresh_milestone_buttons()
+    _mine_world.refresh()
+    if _site_panel.visible:
+        _site_panel.refresh()
     _industry_panel.refresh()
     _center_panel.refresh()
     _technology_panel.refresh()
+
+func _refresh_milestone_buttons() -> void:
+    for milestone in _milestone_buttons:
+        _milestone_buttons[milestone].visible = session.game.depth >= int(milestone)
+
+func _on_world_selection(kind: String, id: String) -> void:
+    _site_panel.show_selection(kind, id, session)
+
+func _focus_depth(target_depth: int) -> void:
+    _mine_world.focus_depth(target_depth)
+
+func _focus_drill() -> void:
+    _mine_world.focus_depth(session.game.depth)
 
 func _refresh_notices() -> void:
     _save_notice.visible = session.save_blocked or session.save_error != ""
@@ -227,9 +277,8 @@ func _responsive() -> void:
         return
     var narrow := size.x < 1000
     _wallet_grid.columns = 3 if narrow else 7
-    var mine_columns = find_child("MineColumns", true, false) as BoxContainer
-    if mine_columns != null:
-        mine_columns.vertical = size.x < 720
+    if _mine_layout != null:
+        _mine_layout.vertical = size.x < 880
     if _industry_panel != null:
         _industry_panel._responsive()
 
