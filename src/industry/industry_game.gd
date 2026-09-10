@@ -6,6 +6,7 @@ const Discovery = preload("res://src/industry/industry_discovery.gd")
 const FACILITIES: Array[String] = ["furnace", "workshop", "drill"]
 const V1_RESOURCE_IDS := ["iron", "coal", "copper", "iron_ingot", "copper_ingot", "cable"]
 const PRIORITY_BRANCHES := ["production", "logistics", "exploration"]
+const PRIORITY_COOLDOWN_SECONDS := 300.0
 const EPSILON := 0.000001
 
 var resources: Dictionary = {
@@ -44,7 +45,7 @@ func advance(seconds: float) -> Dictionary:
     var elapsed_remaining := seconds
     while elapsed_remaining > 0.0:
         if jobs.is_empty() and explorations.is_empty():
-            _produce_for_duration(elapsed_remaining, report["produced"])
+            _advance_for_duration(elapsed_remaining, report["produced"])
             break
 
         var segment := elapsed_remaining
@@ -53,7 +54,7 @@ func advance(seconds: float) -> Dictionary:
         for exploration in explorations.values():
             segment = minf(segment, float(exploration["remaining"]))
 
-        _produce_for_duration(segment, report["produced"])
+        _advance_for_duration(segment, report["produced"])
         for job in jobs.values():
             job["remaining"] = maxf(0.0, float(job["remaining"]) - segment)
         for exploration in explorations.values():
@@ -177,11 +178,24 @@ func discoveries_for_depth(target_depth: int) -> Array:
     result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("slot", 0)) < int(b.get("slot", 0)))
     return result
 
+func production_multiplier() -> float:
+    var value := 1.0
+    if "production_1" in built_technologies:
+        value += float(Catalog.TECHNOLOGIES["production_1"]["effect"])
+    if priority_branch == "production":
+        value += float(Catalog.PRIORITY_BONUSES["production"]["production_rate"])
+    return value
+
 func quality_floor() -> float:
-    return 0.0
+    var value := 0.0
+    if "exploration_1" in built_technologies:
+        value += float(Catalog.TECHNOLOGIES["exploration_1"]["effect"])
+    if priority_branch == "exploration":
+        value += float(Catalog.PRIORITY_BONUSES["exploration"]["quality_floor"])
+    return clampf(value, 0.0, 0.8)
 
 func total_capacity() -> int:
-    return int(Catalog.CENTER_LEVELS[center_level]["capacity"])
+    return _capacity_for_priority(priority_branch)
 
 func used_capacity() -> int:
     var total := 0
@@ -264,6 +278,64 @@ func set_site_active(site_id: String, active: bool) -> bool:
         discoveries[site_id] = discovery
     return true
 
+func technology_unlock_block_reason(id: String) -> String:
+    if not Catalog.TECHNOLOGIES.has(id):
+        return "Technologie inconnue"
+    if depth < 90:
+        return "Technologies disponibles à partir de 90 m"
+    if id in unlocked_technologies:
+        return "Technologie déjà débloquée"
+    var required_points := int(Catalog.TECHNOLOGIES[id].get("tech_points", 1))
+    if tech_points < required_points:
+        return "Point technologique insuffisant"
+    return ""
+
+func unlock_technology(id: String) -> bool:
+    if technology_unlock_block_reason(id) != "":
+        return false
+    tech_points -= int(Catalog.TECHNOLOGIES[id].get("tech_points", 1))
+    unlocked_technologies.append(id)
+    return true
+
+func technology_build_block_reason(id: String) -> String:
+    if not Catalog.TECHNOLOGIES.has(id):
+        return "Technologie inconnue"
+    if id not in unlocked_technologies:
+        return "Technologie non débloquée"
+    if id in built_technologies:
+        return "Technologie déjà construite"
+    var cost: Dictionary = Catalog.TECHNOLOGIES[id]["cost"]
+    if not can_afford(cost):
+        return "Ressources insuffisantes"
+    return ""
+
+func build_technology(id: String) -> bool:
+    if technology_build_block_reason(id) != "":
+        return false
+    _spend(Catalog.TECHNOLOGIES[id]["cost"])
+    built_technologies.append(id)
+    return true
+
+func priority_block_reason(branch: String) -> String:
+    if branch not in PRIORITY_BRANCHES:
+        return "Branche inconnue"
+    if depth < 90:
+        return "Spécialisations disponibles à partir de 90 m"
+    if branch == priority_branch:
+        return "Branche déjà prioritaire"
+    if priority_cooldown_remaining > EPSILON:
+        return "Changement de priorité en recharge"
+    if used_capacity() > _capacity_for_priority(branch):
+        return "Désactivez un site avant de quitter la priorité Logistique"
+    return ""
+
+func set_priority(branch: String) -> bool:
+    if priority_block_reason(branch) != "":
+        return false
+    priority_branch = branch
+    priority_cooldown_remaining = PRIORITY_COOLDOWN_SECONDS
+    return true
+
 func can_afford(cost: Dictionary) -> bool:
     for id in cost:
         if not resources.has(id) or not _finite_number(resources[id]) or not _finite_number(cost[id]) or float(cost[id]) < 0.0:
@@ -276,7 +348,7 @@ func mine_rate(id: String) -> float:
     if not Catalog.MINES.has(id) or not mine_levels.has(id):
         return 0.0
     var depth_bonus := 1.0 + 0.15 * floori(float(depth) / 30.0)
-    return float(Catalog.MINES[id]["base_rate"]) * int(mine_levels[id]) * depth_bonus
+    return float(Catalog.MINES[id]["base_rate"]) * int(mine_levels[id]) * depth_bonus * production_multiplier()
 
 func mine_upgrade_cost(id: String) -> Dictionary:
     if not Catalog.MINES.has(id) or not mine_levels.has(id):
@@ -363,6 +435,14 @@ func start_excavation() -> bool:
     }
     return true
 
+func _capacity_for_priority(branch: String) -> int:
+    var value := int(Catalog.CENTER_LEVELS[center_level]["capacity"])
+    if "logistics_1" in built_technologies:
+        value += int(Catalog.TECHNOLOGIES["logistics_1"]["effect"])
+    if branch == "logistics":
+        value += int(Catalog.PRIORITY_BONUSES["logistics"]["capacity"])
+    return value
+
 func _apply_milestones_up_to(target_depth: int) -> void:
     for milestone_depth in Catalog.MILESTONES:
         var milestone := int(milestone_depth)
@@ -383,9 +463,10 @@ func _ensure_discovery(target_depth: int, slot: int) -> void:
         return
     discoveries[id] = Discovery.generate(world_seed, target_depth, slot, quality_floor())
 
-func _produce_for_duration(seconds: float, produced: Dictionary) -> void:
+func _advance_for_duration(seconds: float, produced: Dictionary) -> void:
     _produce_minerals(seconds, produced)
     _produce_permanent_sites(seconds, produced)
+    priority_cooldown_remaining = maxf(0.0, priority_cooldown_remaining - seconds)
 
 func _produce_minerals(seconds: float, produced: Dictionary) -> void:
     for id in Catalog.MINES:
@@ -612,7 +693,7 @@ func _valid_permanent_sites(value: Variant) -> bool:
             return false
         if typeof(site["active"]) != TYPE_BOOL:
             return false
-        if not _valid_integer(site["capacity"], 0) or int(site["capacity"]) != int(Catalog.POCKET_TYPES[type_id]["capacity"]):
+        if not _valid_integer(site["capacity"], 0):
             return false
         if not _valid_integer(site["depth"], 0) or int(site["depth"]) % 10 != 0:
             return false
