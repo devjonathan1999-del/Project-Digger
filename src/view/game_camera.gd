@@ -15,6 +15,19 @@ func set_focus_cell(cell: Vector2i, cell_size: int) -> void:
         float(cell.y * cell_size) + half_cell
     )
 
+func set_initial_zoom(value: float) -> void:
+    _set_zoom_level(value)
+
+func play_impulse(strength: float) -> void:
+    var amount := clampf(strength, 0.0, 8.0)
+    if amount <= 0.0:
+        return
+    offset = Vector2.ZERO
+    var tween := create_tween()
+    tween.tween_property(self, "offset", Vector2(amount, -amount * 0.5), 0.04)
+    tween.tween_property(self, "offset", Vector2(-amount * 0.55, amount * 0.35), 0.05)
+    tween.tween_property(self, "offset", Vector2.ZERO, 0.08)
+
 func _process(delta: float) -> void:
     var direction := Input.get_vector("camera_left", "camera_right", "camera_up", "camera_down")
     if direction != Vector2.ZERO:
