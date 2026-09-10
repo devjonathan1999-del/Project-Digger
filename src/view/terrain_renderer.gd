@@ -178,12 +178,12 @@ func _draw_material_detail(pos: Vector2i, material_id: StringName, variant: int)
     var detail: Color = VisualProfile.detail_color(material_id)
     match material_id:
         &"rock_fragile":
-            var x_shift := 3.0 + float(variant)
-            draw_polyline(PackedVector2Array([
-                origin + Vector2(x_shift, 4.0),
-                origin + Vector2(8.0, 8.0),
-                origin + Vector2(6.0 + float(variant), 13.0),
-            ]), detail.darkened(0.14), 1.1, true)
+            if variant == 0:
+                draw_polyline(PackedVector2Array([
+                    origin + Vector2(4.0, 2.0),
+                    origin + Vector2(9.0, 8.0),
+                    origin + Vector2(6.0, 15.0),
+                ]), detail.darkened(0.16), 1.05, true)
         &"stabilizer":
             var center := origin + Vector2(8.0 + float(variant - 1), 8.0)
             draw_colored_polygon(PackedVector2Array([
@@ -193,11 +193,10 @@ func _draw_material_detail(pos: Vector2i, material_id: StringName, variant: int)
                 center + Vector2(-3, 0),
             ]), detail)
         &"rock_dense":
-            if variant <= 1:
-                draw_line(origin + Vector2(4, 11), origin + Vector2(12, 9), detail.darkened(0.18), 1.0, true)
-        &"rock_common":
             if variant == 0:
-                draw_circle(origin + Vector2(10, 6), 1.25, detail.darkened(0.08))
+                draw_line(origin + Vector2(2, 12), origin + Vector2(14, 8), detail.darkened(0.24), 0.9, true)
+        &"rock_common":
+            pass
 
 func _analysis_color(state: int) -> Color:
     match state:
