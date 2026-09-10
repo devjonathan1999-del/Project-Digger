@@ -71,8 +71,8 @@ func refresh() -> void:
         var widgets: Dictionary = _tech_widgets[id]
         var definition: Dictionary = Catalog.TECHNOLOGIES[id]
         var branch := str(definition["branch"])
-        var unlocked := id in game.unlocked_technologies
-        var built := id in game.built_technologies
+        var unlocked: bool = id in game.unlocked_technologies
+        var built: bool = id in game.built_technologies
         widgets["state"].text = "Construite" if built else ("Débloquée" if unlocked else game.technology_unlock_block_reason(id))
         widgets["unlock"].visible = not unlocked
         widgets["unlock"].disabled = game.technology_unlock_block_reason(id) != ""
