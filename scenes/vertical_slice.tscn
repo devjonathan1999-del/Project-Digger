@@ -26,6 +26,7 @@ script = ExtResource("5_fx")
 
 [node name="GameCamera" type="Camera2D" parent="."]
 enabled = true
+zoom = Vector2(1.35, 1.35)
 script = ExtResource("6_camera")
 
 [node name="GameInput" type="Node" parent="."]
