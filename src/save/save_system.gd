@@ -10,6 +10,17 @@ func save_default(model: TerrainModel, extra: Dictionary) -> bool:
 func load_default() -> Dictionary:
     return load_from_path(DEFAULT_PATH)
 
+func load_default_for_content(content_id: String) -> Dictionary:
+    return load_from_path_for_content(DEFAULT_PATH, content_id)
+
+func load_from_path_for_content(path: String, content_id: String) -> Dictionary:
+    var data := load_from_path(path)
+    if data.is_empty():
+        return {}
+    if String(data.get("content_id", "")) != content_id:
+        return {}
+    return data
+
 func save_to_path(path: String, model: TerrainModel, extra: Dictionary) -> bool:
     if model == null:
         push_error("SaveSystem: terrain model is required")
@@ -27,6 +38,7 @@ func save_to_path(path: String, model: TerrainModel, extra: Dictionary) -> bool:
         "relay_connected": bool(extra.get("relay_connected", false)),
         "cycle_state": cycle_state,
         "objective_reached": bool(extra.get("objective_reached", false)),
+        "content_id": String(extra.get("content_id", "")),
     }
 
     var file := FileAccess.open(path, FileAccess.WRITE)
