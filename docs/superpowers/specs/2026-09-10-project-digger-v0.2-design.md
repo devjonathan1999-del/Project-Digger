@@ -105,6 +105,28 @@ The relay and conductive route should use:
 
 The ancient system should feel discovered inside the geology rather than placed on top like a modern electrical installation.
 
+### 3.5 Mockup interpretation
+
+The approved Observer and Prepare mockups define the visual direction, not a literal feature checklist.
+
+They validate:
+
+- organic cavern silhouettes,
+- dark mineral sci-fi atmosphere,
+- cyan ancient technology,
+- contextual tactical overlays,
+- compact game-like HUD hierarchy.
+
+Elements visible in the mockups but not otherwise specified are **not** automatically part of v0.2. In particular, the following are not required by this milestone:
+
+- minimap,
+- depth counter,
+- zone name,
+- permanent material legend,
+- decorative title/logo watermark.
+
+These can be considered later if they solve a demonstrated gameplay need.
+
 ## 4. First real cave
 
 The v0.1 technical test layout is replaced by a designed cave with three connected spaces.
@@ -157,7 +179,7 @@ The player may, within the limits of the existing systems:
 
 - remove the supports directly,
 - reinforce/reposition material before triggering,
-- collect/use stabilizer as part of preparation where the existing mechanics permit it.
+- use stabilizer as part of preparation where the existing mechanics actually permit it.
 
 The v0.2 does not need many alternative solutions. It needs enough systemic freedom that the player feels they manipulated a physical problem rather than executed a hidden script.
 
@@ -272,14 +294,18 @@ No dense music system is required for v0.2.
 
 Interactions should provide concise feedback:
 
-- hover/selection: light mineral/UI tick,
+- selection/confirmed action: light mineral/UI tick,
 - common rock: dry stone response,
 - fragile rock: sharper/cracking response,
 - dense rock: heavy/low response,
 - stabilizer: crystalline response,
 - ancient conductor: mineral-electronic tone.
 
-Fragile and critical analysis states may add restrained looping/occasional tension cues, but must not become noisy.
+Raw mouse hover should **not** emit a sound on every crossed cell; that would conflict with the calm interaction target. Hover feedback is primarily visual.
+
+No continuous stability warning loop is required in v0.2. Fragile/Critical tension is communicated primarily through the analysis overlay and the resolution feedback.
+
+If final audio assets are not available, implementation may use simple original/procedural placeholder cues. No external unlicensed audio is assumed by this spec.
 
 ### 8.3 Resolution sequence
 
@@ -296,6 +322,8 @@ Target sequence:
 7. short success cue if the descent is opened.
 
 The simulation remains deterministic and authoritative. Visual/audio feedback reacts to resolved movements; it never decides them.
+
+The anticipation pause belongs to the presentation/input orchestration layer. `SimulationController.trigger_resolution()` may remain synchronous and deterministic for headless tests; the UI may delay calling it briefly for presentation.
 
 ### 8.4 Camera shake limits
 
@@ -364,13 +392,23 @@ A small presentation-only component listens to meaningful events and coordinates
 
 It must consume simulation results rather than duplicate simulation logic.
 
-## 10. Persistence
+## 10. Persistence and v0.1 save compatibility
 
-Existing v0.1 terrain persistence remains valid.
+Terrain persistence remains required, but the v0.2 replaces the actual cave content. A development save from v0.1 must therefore not silently restore the old technical layout into the new presentation.
 
-The v0.2 visual changes must not require saving decorative renderer state.
+The v0.2 save metadata must identify the content/layout it belongs to, for example with a stable identifier such as `cave_v02_helix_01`.
 
-If any new gameplay-relevant value is introduced during implementation, the save schema must be explicitly versioned and tested. Pure presentation state is not persisted unless there is a clear user-facing need.
+Load behavior is explicit:
+
+- compatible v0.2 content identifier → restore the saved terrain and objective state;
+- missing identifier from an older v0.1 development save → treat as incompatible and start the new v0.2 cave;
+- different/future content identifier → do not inject that terrain into this cave; start the correct layout or reject according to the save-system contract.
+
+Old v0.1 development-save migration is not required. Resetting that prototype save is acceptable because v0.1 was not a released player-data contract.
+
+Pure decorative renderer state is not persisted.
+
+If the save schema itself changes rather than only its existing metadata/extra payload, the schema version must be bumped and tested explicitly.
 
 ## 11. Testing requirements
 
@@ -387,7 +425,8 @@ At minimum:
 - expected dense formation collapse,
 - open exit corridor after solution,
 - relay preserved by the canonical solution,
-- save/reload after completion,
+- compatible save/reload after completion,
+- incompatible/missing v0.1 content identifier does not restore the technical layout,
 - hover/cell-coordinate conversion if renderer interaction logic changes,
 - feedback classification logic if event magnitude is introduced.
 
@@ -410,7 +449,8 @@ Before v0.2 can merge:
 - Canonical collapse opens the descent.
 - Relay state remains correct.
 - Collapse animation/feedback is readable.
-- Save/reload preserves the solved terrain state.
+- Save/reload preserves the solved v0.2 terrain state.
+- An old v0.1 development save does not replace the new cave with the technical layout.
 - Existing controls still work.
 - Headless CI is green on the final branch tip.
 
@@ -430,6 +470,7 @@ The following remain outside v0.2:
 - monetization,
 - mobile-specific controls,
 - broad accessibility/settings menu work,
+- minimap/depth-navigation system,
 - additional biomes.
 
 These systems belong to later versions once the core cave interaction is visually and tactically convincing.
@@ -452,5 +493,6 @@ Project Digger v0.2 is done when:
 4. the central collapse remains deterministic and understandable,
 5. the resolution has concise audiovisual impact,
 6. persistence and the v0.1 gameplay loop remain intact,
-7. manual acceptance is complete,
-8. the full Godot 4.7.2 headless CI suite passes on the final v0.2 branch tip.
+7. incompatible v0.1 prototype terrain is not restored into the v0.2 cave,
+8. manual acceptance is complete,
+9. the full Godot 4.7.2 headless CI suite passes on the final v0.2 branch tip.
