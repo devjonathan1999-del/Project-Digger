@@ -2,6 +2,8 @@ class_name TerrainRenderer
 extends Node2D
 
 const CELL_SIZE := 16
+const ANALYSIS_RADIUS := 4
+const SELECTION_ANALYSIS_RADIUS := 2
 const VisualProfile := preload("res://src/view/terrain_visual_profile.gd")
 
 var _model: TerrainModel
@@ -37,6 +39,16 @@ func set_hovered_cell(cell: Vector2i) -> void:
 func clear_hovered_cell() -> void:
     _has_hover = false
     queue_redraw()
+
+func analysis_visible_for(pos: Vector2i) -> bool:
+    if not _prepare_mode:
+        return false
+    if _has_hover and _manhattan_distance(pos, _hovered_cell) <= ANALYSIS_RADIUS:
+        return true
+    for selected in _selection:
+        if _manhattan_distance(pos, selected) <= SELECTION_ANALYSIS_RADIUS:
+            return true
+    return false
 
 func cell_from_local(local_pos: Vector2) -> Vector2i:
     return Vector2i(
@@ -83,7 +95,7 @@ func _draw() -> void:
             _draw_material_detail(pos, cell.material_id, variant)
             _draw_exposed_edges(pos, polygon)
 
-            if _prepare_mode and _analysis.has(pos):
+            if _analysis.has(pos) and analysis_visible_for(pos):
                 draw_colored_polygon(polygon, _analysis_color(int(_analysis[pos])))
 
     for selected in _selection:
@@ -91,8 +103,8 @@ func _draw() -> void:
             _draw_outline(_cell_polygon(selected), Color(0.92, 0.97, 1.0, 0.95), 2.0)
 
     if _has_hover and _model.get_cell(_hovered_cell) != null:
-        var hover_color := Color(0.65, 0.90, 0.96, 0.72) if not _prepare_mode else Color(0.85, 0.95, 1.0, 0.95)
-        _draw_outline(_cell_polygon(_hovered_cell), hover_color, 2.0)
+        var hover_color := Color(0.65, 0.90, 0.96, 0.72) if not _prepare_mode else Color(0.85, 0.95, 1.0, 0.92)
+        _draw_outline(_cell_polygon(_hovered_cell), hover_color, 1.8)
 
     for movement in _motion_preview:
         var from: Vector2i = movement.get("from", Vector2i.ZERO)
@@ -101,6 +113,9 @@ func _draw() -> void:
         var to_px := Vector2(to.x * CELL_SIZE, to.y * CELL_SIZE)
         var draw_pos := from_px.lerp(to_px, _motion_progress)
         draw_rect(Rect2(draw_pos + Vector2(1, 1), Vector2(CELL_SIZE - 2, CELL_SIZE - 2)), Color(0.92, 0.96, 1.0, 0.28), true)
+
+func _manhattan_distance(a: Vector2i, b: Vector2i) -> int:
+    return absi(a.x - b.x) + absi(a.y - b.y)
 
 func _has_cell(pos: Vector2i) -> bool:
     return _model != null and pos.x >= 0 and pos.y >= 0 and pos.x < _model.width and pos.y < _model.height and _model.get_cell(pos) != null
@@ -184,10 +199,10 @@ func _draw_material_detail(pos: Vector2i, material_id: StringName, variant: int)
 func _analysis_color(state: int) -> Color:
     match state:
         StabilitySystem.STABLE:
-            return Color(0.22, 0.76, 0.55, 0.16)
+            return Color(0.22, 0.76, 0.55, 0.08)
         StabilitySystem.FRAGILE:
-            return Color(0.96, 0.68, 0.20, 0.24)
+            return Color(0.96, 0.68, 0.20, 0.14)
         StabilitySystem.CRITICAL:
-            return Color(0.95, 0.25, 0.22, 0.30)
+            return Color(0.95, 0.25, 0.22, 0.20)
         _:
             return Color(0.0, 0.0, 0.0, 0.0)
