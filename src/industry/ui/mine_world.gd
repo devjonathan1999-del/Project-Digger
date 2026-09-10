@@ -135,18 +135,18 @@ func _draw_surface_modules(surface_y: float) -> void:
     var start_x := maxf(10.0, (width - total) * 0.5)
     var colors := [Color("8d6744"), Color("af7d4c"), Color("71818a"), Color("526b75")]
     for index in range(4):
-        var x := start_x + index * (module_w + gap)
+        var x: float = start_x + index * (module_w + gap)
         draw_rect(Rect2(x, base_y - 30.0, module_w, 30.0), colors[index])
         draw_rect(Rect2(x + 7.0, base_y - 22.0, module_w - 14.0, 7.0), Color("d0a06a"))
 
 func _draw_crystal_signatures() -> void:
-    var widths := [0.18, 0.78, 0.28, 0.70]
-    var depths := [98.0, 112.0, 132.0, 154.0]
+    var widths: Array[float] = [0.18, 0.78, 0.28, 0.70]
+    var depths: Array[float] = [98.0, 112.0, 132.0, 154.0]
     for index in range(depths.size()):
         var y := _depth_to_y(depths[index])
         if y < 0.0 or y > size.y:
             continue
-        var x := size.x * widths[index]
+        var x: float = size.x * widths[index]
         var points := PackedVector2Array([
             Vector2(x, y - 8),
             Vector2(x + 7, y + 5),
@@ -164,9 +164,10 @@ func _rebuild_targets() -> void:
         return
 
     var mine_ids: Array = Catalog.MINES.keys()
+    var ratios: Array[float] = [0.18, 0.50, 0.82]
     for index in range(mine_ids.size()):
         var id := str(mine_ids[index])
-        var x_ratio := [0.18, 0.50, 0.82][index % 3]
+        var x_ratio: float = ratios[index % 3]
         _add_target("Mine_" + id, "mine", id, Vector2(size.x * x_ratio, _depth_to_y(12.0)), Catalog.RESOURCES[id]["label"])
 
     _add_target("Drill", "drill", "drill", Vector2(size.x * 0.5, _depth_to_y(float(session.game.depth) + 7.0)), "Foreuse")
@@ -176,7 +177,7 @@ func _rebuild_targets() -> void:
     for discovery_id in discovery_ids:
         var discovery: Dictionary = session.game.discoveries[discovery_id]
         var slot := int(discovery.get("slot", 0))
-        var x := size.x * (0.24 if slot % 2 == 0 else 0.76)
+        var x: float = size.x * (0.24 if slot % 2 == 0 else 0.76)
         var label := str(discovery.get("hint", "Découverte"))
         _add_target("Discovery_" + str(discovery_id).replace(":", "_"), "discovery", str(discovery_id), Vector2(x, _depth_to_y(float(discovery.get("depth", 0)))), label)
 
@@ -184,7 +185,7 @@ func _rebuild_targets() -> void:
     site_ids.sort()
     for site_id in site_ids:
         var site: Dictionary = session.game.permanent_sites[site_id]
-        var x := size.x * 0.76
+        var x: float = size.x * 0.76
         _add_target("Site_" + str(site_id).replace(":", "_"), "site", str(site_id), Vector2(x, _depth_to_y(float(site.get("depth", 0)))), "Site")
 
 func _add_target(node_name: String, kind: String, id: String, center: Vector2, title: String) -> void:
