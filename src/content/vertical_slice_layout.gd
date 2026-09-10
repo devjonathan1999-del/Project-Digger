@@ -16,47 +16,66 @@ const SUPPORT_REMOVAL: Array[Vector2i] = [
 func build() -> Dictionary:
     var model := TerrainModel.new(WIDTH, HEIGHT)
 
-    # Permanent outer rock keeps the slice visually framed and structurally anchored.
+    # Anchored outer geology.
     _fill_rect(model, Rect2i(0, 0, 6, HEIGHT), &"rock_dense")
     _fill_rect(model, Rect2i(58, 0, 6, HEIGHT), &"rock_dense")
+    _fill_rect(model, Rect2i(6, 0, 52, 4), &"rock_dense")
 
-    # Entrance: diggable material around rows 4–12, connected to the left wall.
-    _fill_rect(model, Rect2i(6, 8, 20, 3), &"rock_common")
+    # Entrance pocket: stepped common/fragile ledges instead of a flat band.
+    _fill_rect(model, Rect2i(6, 8, 12, 3), &"rock_common")
+    _fill_rect(model, Rect2i(8, 11, 10, 2), &"rock_common")
+    _fill_rect(model, Rect2i(14, 13, 10, 2), &"rock_fragile")
+    _fill_rect(model, Rect2i(20, 15, 6, 2), &"rock_common")
 
-    # Friable ceiling around rows 14–24.
-    _fill_rect(model, Rect2i(6, 18, 19, 2), &"rock_fragile")
-
-    # Stabilizer vein around columns 12–18, rows 28–35.
+    # Left chamber shelves and stabilizer deposit.
+    _fill_rect(model, Rect2i(6, 24, 10, 4), &"rock_common")
+    _fill_rect(model, Rect2i(10, 28, 9, 3), &"rock_fragile")
     _fill_rect(model, Rect2i(12, 31, 7, 2), &"stabilizer")
-    _fill_rect(model, Rect2i(6, 32, 6, 1), &"rock_common")
+    _fill_rect(model, Rect2i(6, 34, 12, 3), &"rock_common")
 
-    # Dense blocking formation. Side masses are anchored to the bottom while a
-    # central dense gate blocks the shaft and can only be removed by collapse.
+    # Central chamber framing.
+    _fill_rect(model, Rect2i(18, 38, 8, 4), &"rock_common")
+    _fill_rect(model, Rect2i(41, 30, 17, 4), &"rock_common")
+    _fill_rect(model, Rect2i(44, 34, 14, 3), &"rock_fragile")
+    _fill_rect(model, Rect2i(46, 50, 12, 5), &"rock_common")
+
+    # Dense blocking formation and stable side masses.
     _fill_rect(model, Rect2i(26, 40, 5, 32), &"rock_dense")
     _fill_rect(model, Rect2i(34, 40, 7, 32), &"rock_dense")
+    _fill_rect(model, Rect2i(29, 39, 7, 3), &"rock_dense")
     model.set_cell(GATE_POS, TerrainCell.new(&"rock_dense"))
 
-    # Canonical removable support beneath the gate. The small cantilever at
-    # (31,47) is supported by the anchored mass at x=30.
-    model.set_cell(Vector2i(32, 45), TerrainCell.new(&"rock_common"))
-    model.set_cell(Vector2i(32, 46), TerrainCell.new(&"rock_common"))
-    model.set_cell(Vector2i(32, 47), TerrainCell.new(&"rock_common"))
-    model.set_cell(Vector2i(31, 47), TerrainCell.new(&"rock_common"))
+    # Canonical removable supports.
+    for support_pos in SUPPORT_REMOVAL:
+        model.set_cell(support_pos, TerrainCell.new(&"rock_common"))
 
-    # Stable support spine for the ancient network, separate from the gate shaft.
+    # Stable spine and ancient route.
     _fill_rect(model, Rect2i(24, 46, 1, 26), &"rock_dense")
-
     var relay_source := Vector2i(18, 54)
     var relay_pos := Vector2i(25, 46)
-    _fill_rect(model, Rect2i(19, 54, 6, 1), &"stabilizer")
-    _fill_rect(model, Rect2i(25, 47, 1, 8), &"stabilizer")
+    var ancient_path: Array[Vector2i] = []
+    for x in range(18, 26):
+        ancient_path.append(Vector2i(x, 54))
+    for y in range(53, 45, -1):
+        ancient_path.append(Vector2i(25, y))
+    for pos in ancient_path:
+        model.set_cell(pos, TerrainCell.new(&"stabilizer"))
+
+    # Lower descent framing.
+    _fill_rect(model, Rect2i(6, 58, 18, 6), &"rock_common")
+    _fill_rect(model, Rect2i(41, 58, 17, 6), &"rock_common")
+    _fill_rect(model, Rect2i(8, 64, 16, 8), &"rock_dense")
+    _fill_rect(model, Rect2i(41, 64, 17, 8), &"rock_dense")
 
     return {
         "model": model,
         "relay_source": relay_source,
         "relay_pos": relay_pos,
+        "ancient_path": ancient_path,
+        "entrance_rect": Rect2i(6, 5, 20, 12),
+        "chamber_rect": Rect2i(18, 22, 28, 36),
         "exit_rect": Rect2i(31, 65, 3, 5),
-        "spawn_focus": Vector2i(22, 9),
+        "spawn_focus": Vector2i(22, 12),
     }
 
 func _fill_rect(model: TerrainModel, rect: Rect2i, material_id: StringName) -> void:
