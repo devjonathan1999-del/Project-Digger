@@ -13,6 +13,7 @@ func run(t: TestSupport) -> void:
     test_invalid_load_blocks_all_writes(t)
     test_write_failure_exposes_notice_and_preserves_save(t)
     test_successful_action_is_persisted(t)
+    test_progression_action_is_persisted(t)
     _cleanup()
 
 func test_explicit_session_round_trip(t: TestSupport) -> void:
@@ -117,6 +118,25 @@ func test_successful_action_is_persisted(t: TestSupport) -> void:
     reopened.save_path = PATH
     reopened.initialize(Time.get_unix_time_from_system())
     t.check(reopened.game.jobs.has("furnace"), "action session sauvegardée immédiatement")
+    session.free()
+    reopened.free()
+    _cleanup()
+
+func test_progression_action_is_persisted(t: TestSupport) -> void:
+    _cleanup()
+    var now := Time.get_unix_time_from_system()
+    var session = IndustrySessionScript.new()
+    session.save_path = PATH
+    session.initialize(now)
+    session.game.depth = 30
+    session.game.resources["iron"] = 100.0
+    session.game.resources["coal"] = 100.0
+    t.check(session.upgrade_center(), "amélioration Centre exposée par la session")
+
+    var reopened = IndustrySessionScript.new()
+    reopened.save_path = PATH
+    reopened.initialize(Time.get_unix_time_from_system())
+    t.equal(reopened.game.center_level, 2, "amélioration Centre sauvegardée immédiatement")
     session.free()
     reopened.free()
     _cleanup()
