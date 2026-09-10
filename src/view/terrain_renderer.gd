@@ -2,6 +2,7 @@ class_name TerrainRenderer
 extends Node2D
 
 const CELL_SIZE := 16
+const VisualProfile := preload("res://src/view/terrain_visual_profile.gd")
 
 var _model: TerrainModel
 var _analysis: Dictionary = {}
@@ -76,8 +77,8 @@ func _draw() -> void:
                 continue
 
             var polygon := _cell_polygon(pos)
-            var variant := TerrainVisualProfile.detail_variant(pos, cell.material_id)
-            var base := TerrainVisualProfile.base_color(cell.material_id).lightened(float(variant) * 0.012)
+            var variant: int = VisualProfile.detail_variant(pos, cell.material_id)
+            var base: Color = VisualProfile.base_color(cell.material_id).lightened(float(variant) * 0.012)
             draw_colored_polygon(polygon, base)
             _draw_material_detail(pos, cell.material_id, variant)
             _draw_exposed_edges(pos, polygon)
@@ -106,10 +107,10 @@ func _has_cell(pos: Vector2i) -> bool:
 
 func _cell_polygon(pos: Vector2i) -> PackedVector2Array:
     var origin := Vector2(pos.x * CELL_SIZE, pos.y * CELL_SIZE)
-    var top := TerrainVisualProfile.edge_inset(pos, TerrainVisualProfile.Edge.TOP) if not _has_cell(pos + Vector2i.UP) else 0.0
-    var right := TerrainVisualProfile.edge_inset(pos, TerrainVisualProfile.Edge.RIGHT) if not _has_cell(pos + Vector2i.RIGHT) else 0.0
-    var bottom := TerrainVisualProfile.edge_inset(pos, TerrainVisualProfile.Edge.BOTTOM) if not _has_cell(pos + Vector2i.DOWN) else 0.0
-    var left := TerrainVisualProfile.edge_inset(pos, TerrainVisualProfile.Edge.LEFT) if not _has_cell(pos + Vector2i.LEFT) else 0.0
+    var top: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.TOP) if not _has_cell(pos + Vector2i.UP) else 0.0
+    var right: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.RIGHT) if not _has_cell(pos + Vector2i.RIGHT) else 0.0
+    var bottom: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.BOTTOM) if not _has_cell(pos + Vector2i.DOWN) else 0.0
+    var left: float = VisualProfile.edge_inset(pos, VisualProfile.Edge.LEFT) if not _has_cell(pos + Vector2i.LEFT) else 0.0
     return PackedVector2Array([
         origin + Vector2(left, top),
         origin + Vector2(CELL_SIZE - right, top),
@@ -137,7 +138,7 @@ func _draw_exposed_edges(pos: Vector2i, polygon: PackedVector2Array) -> void:
 
 func _draw_material_detail(pos: Vector2i, material_id: StringName, variant: int) -> void:
     var origin := Vector2(pos.x * CELL_SIZE, pos.y * CELL_SIZE)
-    var detail := TerrainVisualProfile.detail_color(material_id)
+    var detail: Color = VisualProfile.detail_color(material_id)
     match material_id:
         &"rock_fragile":
             var x_shift := 3.0 + float(variant)
