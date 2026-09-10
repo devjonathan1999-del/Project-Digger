@@ -3,6 +3,10 @@ extends RefCounted
 const PROFILE_PATH := "res://src/view/terrain_visual_profile.gd"
 
 func run(t: TestSupport) -> void:
+    test_profile(t)
+    test_renderer_coordinate_conversion(t)
+
+func test_profile(t: TestSupport) -> void:
     var exists := ResourceLoader.exists(PROFILE_PATH)
     t.equal(exists, true, "profil visuel terrain disponible")
     if not exists:
@@ -24,3 +28,12 @@ func run(t: TestSupport) -> void:
 
     var variant: int = profile.call("detail_variant", pos, &"rock_fragile")
     t.check(variant >= 0 and variant <= 3, "variante de détail bornée")
+
+func test_renderer_coordinate_conversion(t: TestSupport) -> void:
+    var renderer := TerrainRenderer.new()
+    var has_api := renderer.has_method("cell_from_local")
+    t.equal(has_api, true, "conversion locale du renderer disponible")
+    if not has_api:
+        return
+    t.equal(renderer.call("cell_from_local", Vector2(0.0, 0.0)), Vector2i(0, 0), "origine vers cellule 0,0")
+    t.equal(renderer.call("cell_from_local", Vector2(31.9, 48.1)), Vector2i(1, 3), "conversion locale respecte CELL_SIZE")
