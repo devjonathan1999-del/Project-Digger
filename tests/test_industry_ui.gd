@@ -3,6 +3,7 @@ extends SceneTree
 const Support = preload("res://tests/test_support.gd")
 const Save = preload("res://src/industry/industry_save.gd")
 const Game = preload("res://src/industry/industry_game.gd")
+const Discovery = preload("res://src/industry/industry_discovery.gd")
 const PATH := "user://tests/industry_ui.json"
 const INVALID_PATH := "user://tests/industry_ui_invalid.json"
 var t = Support.new()
@@ -48,6 +49,22 @@ func _run() -> void:
     t.check(industry_panel != null and not industry_panel.visible, "Industrie masquée au démarrage")
     t.check(center_panel != null and not center_panel.visible, "Centre masqué au démarrage")
     t.check(technology_panel != null and not technology_panel.visible, "Technologie masquée au démarrage")
+
+    var mine_world = screen.find_child("MineWorld", true, false)
+    t.check(mine_world != null, "vue mine verticale présente")
+    if mine_world != null:
+        t.check(float(mine_world.get("min_zoom")) >= 0.7, "zoom minimum borné")
+        t.check(float(mine_world.get("max_zoom")) <= 1.25, "zoom maximum borné")
+    session.game.discoveries["30:0"] = Discovery.generate(123, 30, 0, 0.0)
+    session.changed.emit()
+    await process_frame
+    var discovery_target = screen.find_child("Discovery_30_0", true, false)
+    t.check(discovery_target != null, "cible de découverte présente dans le monde")
+    if discovery_target != null:
+        await _click(discovery_target)
+    var context_panel = screen.find_child("ContextPanel", true, false)
+    t.check(context_panel != null and context_panel.visible, "clic découverte ouvre le panneau contextuel")
+
     if tab_industry != null:
         await _click(tab_industry)
     t.check(industry_panel != null and industry_panel.visible, "clic Industrie affiche le panneau industriel")
