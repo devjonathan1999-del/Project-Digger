@@ -4,6 +4,7 @@ extends RefCounted
 const IndustryGameScript = preload("res://src/industry/industry_game.gd")
 const SAVE_VERSION := 2
 const LEGACY_VERSION := 1
+const MAX_SAFE_SEED := 2147483646
 const DEFAULT_PATH := "user://industry_v1.json"
 
 func save_game(path: String, game, saved_at_unix: float) -> bool:
@@ -76,9 +77,7 @@ func load_game(path: String, now_unix: float) -> Dictionary:
 
 func _migrate_v1(payload: Dictionary, logical_now: float) -> Dictionary:
     var candidate = IndustryGameScript.new()
-    var seed := int(abs(hash(JSON.stringify(payload))))
-    if seed == 0:
-        seed = 1
+    var seed := _normalized_seed(hash(JSON.stringify(payload)))
     if not candidate.restore_v1(payload["industry"], seed):
         return _new_result(logical_now, "État industriel v1 incohérent")
     return _finish_load(candidate, float(payload["saved_at_unix"]), logical_now)
@@ -110,8 +109,10 @@ func _new_result(saved_at_unix: float, error: String) -> Dictionary:
     }
 
 func _seed_from(value: float) -> int:
-    var seed := int(abs(hash(str(value))))
-    return seed if seed != 0 else 1
+    return _normalized_seed(hash(str(value)))
+
+func _normalized_seed(value: int) -> int:
+    return abs(value % MAX_SAFE_SEED) + 1
 
 func _valid_version(value: Variant) -> bool:
     if typeof(value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value)):
