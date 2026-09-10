@@ -43,17 +43,21 @@ func advance(seconds: float) -> Dictionary:
 
     var elapsed_remaining := seconds
     while elapsed_remaining > 0.0:
-        if jobs.is_empty():
-            _produce_minerals(elapsed_remaining, report["produced"])
+        if jobs.is_empty() and explorations.is_empty():
+            _produce_for_duration(elapsed_remaining, report["produced"])
             break
 
         var segment := elapsed_remaining
         for job in jobs.values():
             segment = minf(segment, float(job["remaining"]))
+        for exploration in explorations.values():
+            segment = minf(segment, float(exploration["remaining"]))
 
-        _produce_minerals(segment, report["produced"])
+        _produce_for_duration(segment, report["produced"])
         for job in jobs.values():
             job["remaining"] = maxf(0.0, float(job["remaining"]) - segment)
+        for exploration in explorations.values():
+            exploration["remaining"] = maxf(0.0, float(exploration["remaining"]) - segment)
         elapsed_remaining -= segment
 
         for facility in FACILITIES:
@@ -74,6 +78,14 @@ func advance(seconds: float) -> Dictionary:
                 var amount: int = int(completed_job["quantity"])
                 resources[output] = float(resources[output]) + amount
                 _add_produced(report["produced"], output, amount)
+
+        var finished_explorations: Array[String] = []
+        for discovery_id in explorations:
+            if float(explorations[discovery_id]["remaining"]) <= 0.0:
+                finished_explorations.append(str(discovery_id))
+        for discovery_id in finished_explorations:
+            explorations.erase(discovery_id)
+            _complete_exploration(discovery_id, report["produced"])
 
     return report
 
@@ -167,6 +179,90 @@ func discoveries_for_depth(target_depth: int) -> Array:
 
 func quality_floor() -> float:
     return 0.0
+
+func total_capacity() -> int:
+    return int(Catalog.CENTER_LEVELS[center_level]["capacity"])
+
+func used_capacity() -> int:
+    var total := 0
+    for site in permanent_sites.values():
+        if bool(site.get("active", false)):
+            total += int(site.get("capacity", 0))
+    return total
+
+func center_upgrade_block_reason() -> String:
+    var next_level := center_level + 1
+    if not Catalog.CENTER_LEVELS.has(next_level):
+        return "Centre au niveau maximum"
+    var definition: Dictionary = Catalog.CENTER_LEVELS[next_level]
+    if depth < int(definition["depth"]):
+        return "Profondeur insuffisante"
+    if not can_afford(definition["cost"]):
+        return "Ressources insuffisantes"
+    return ""
+
+func upgrade_center() -> bool:
+    if center_upgrade_block_reason() != "":
+        return false
+    var next_level := center_level + 1
+    var definition: Dictionary = Catalog.CENTER_LEVELS[next_level]
+    _spend(definition["cost"])
+    center_level = next_level
+    return true
+
+func exploration_block_reason(discovery_id: String) -> String:
+    if not discoveries.has(discovery_id):
+        return "Découverte inconnue"
+    var discovery: Dictionary = discoveries[discovery_id]
+    if str(discovery.get("state", "")) != "detected":
+        return "Découverte déjà traitée"
+    if explorations.has(discovery_id):
+        return "Exploration déjà en cours"
+    var type_id := str(discovery.get("type", ""))
+    if not Catalog.POCKET_TYPES.has(type_id):
+        return "Type de découverte inconnu"
+    var definition: Dictionary = Catalog.POCKET_TYPES[type_id]
+    if not can_afford(definition["cost"]):
+        return "Ressources insuffisantes"
+    return ""
+
+func start_exploration(discovery_id: String) -> bool:
+    if exploration_block_reason(discovery_id) != "":
+        return false
+    var discovery: Dictionary = discoveries[discovery_id]
+    var definition: Dictionary = Catalog.POCKET_TYPES[str(discovery["type"])]
+    _spend(definition["cost"])
+    var duration := float(definition["seconds"])
+    explorations[discovery_id] = {
+        "discovery_id": discovery_id,
+        "remaining": duration,
+        "duration": duration,
+    }
+    discovery["state"] = "exploring"
+    discoveries[discovery_id] = discovery
+    return true
+
+func site_toggle_block_reason(site_id: String, active: bool) -> String:
+    if not permanent_sites.has(site_id):
+        return "Site inconnu"
+    var site: Dictionary = permanent_sites[site_id]
+    if bool(site.get("active", false)) == active:
+        return "Site déjà dans cet état"
+    if active and used_capacity() + int(site.get("capacity", 0)) > total_capacity():
+        return "Capacité d'exploitation insuffisante"
+    return ""
+
+func set_site_active(site_id: String, active: bool) -> bool:
+    if site_toggle_block_reason(site_id, active) != "":
+        return false
+    var site: Dictionary = permanent_sites[site_id]
+    site["active"] = active
+    permanent_sites[site_id] = site
+    if discoveries.has(site_id):
+        var discovery: Dictionary = discoveries[site_id]
+        discovery["active"] = active
+        discoveries[site_id] = discovery
+    return true
 
 func can_afford(cost: Dictionary) -> bool:
     for id in cost:
@@ -287,11 +383,70 @@ func _ensure_discovery(target_depth: int, slot: int) -> void:
         return
     discoveries[id] = Discovery.generate(world_seed, target_depth, slot, quality_floor())
 
+func _produce_for_duration(seconds: float, produced: Dictionary) -> void:
+    _produce_minerals(seconds, produced)
+    _produce_permanent_sites(seconds, produced)
+
 func _produce_minerals(seconds: float, produced: Dictionary) -> void:
     for id in Catalog.MINES:
         var amount := mine_rate(id) * seconds
         resources[id] = float(resources[id]) + amount
         _add_produced(produced, id, amount)
+
+func _produce_permanent_sites(seconds: float, produced: Dictionary) -> void:
+    for site in permanent_sites.values():
+        if not bool(site.get("active", false)):
+            continue
+        if str(site.get("type", "")) != "crystal_cavern":
+            continue
+        var rate := float(site.get("rate", 0.0))
+        if rate <= 0.0:
+            continue
+        var amount := rate * seconds
+        resources["crystal"] = float(resources["crystal"]) + amount
+        _add_produced(produced, "crystal", amount)
+
+func _complete_exploration(discovery_id: String, produced: Dictionary) -> void:
+    if not discoveries.has(discovery_id):
+        return
+    var discovery: Dictionary = discoveries[discovery_id]
+    var type_id := str(discovery.get("type", ""))
+    if not Catalog.POCKET_TYPES.has(type_id):
+        return
+    var definition: Dictionary = Catalog.POCKET_TYPES[type_id]
+    var reward: Dictionary = discovery.get("reward", {})
+
+    if str(definition["kind"]) == "exhaustible":
+        if reward.has("resource") and reward.has("amount"):
+            var resource_id := str(reward["resource"])
+            var amount := float(reward["amount"])
+            if resources.has(resource_id):
+                resources[resource_id] = float(resources[resource_id]) + amount
+                _add_produced(produced, resource_id, amount)
+        if reward.has("tech_points"):
+            tech_points += int(reward["tech_points"])
+        if reward.has("event") and Catalog.EVENTS.has(str(reward["event"])):
+            pending_events.append({"type": str(reward["event"]), "presented": false})
+        discovery["state"] = "exhausted"
+        discovery["active"] = false
+        discoveries[discovery_id] = discovery
+        return
+
+    var site := {
+        "type": type_id,
+        "active": false,
+        "capacity": int(definition.get("capacity", 0)),
+        "depth": int(discovery.get("depth", 0)),
+        "level": 1,
+        "rate": float(reward.get("rate", 0.0)),
+    }
+    if reward.has("tech_points"):
+        tech_points += int(reward["tech_points"])
+    site["active"] = used_capacity() + int(site["capacity"]) <= total_capacity()
+    permanent_sites[discovery_id] = site
+    discovery["state"] = "opened"
+    discovery["active"] = bool(site["active"])
+    discoveries[discovery_id] = discovery
 
 func _add_produced(produced: Dictionary, id: String, amount: float) -> void:
     produced[id] = float(produced.get(id, 0.0)) + amount
@@ -345,7 +500,11 @@ func _valid_snapshot(data: Dictionary) -> bool:
         return false
     if not _valid_integer(data["center_level"], 1, Catalog.CENTER_LEVELS.size()):
         return false
-    if typeof(data["permanent_sites"]) != TYPE_DICTIONARY or typeof(data["discoveries"]) != TYPE_DICTIONARY or typeof(data["explorations"]) != TYPE_DICTIONARY:
+    if not _valid_discoveries(data["discoveries"]):
+        return false
+    if not _valid_permanent_sites(data["permanent_sites"]):
+        return false
+    if not _valid_explorations(data["explorations"], data["discoveries"]):
         return false
     if not _valid_claimed_milestones(data["claimed_milestones"]):
         return false
@@ -364,6 +523,8 @@ func _valid_snapshot(data: Dictionary) -> bool:
         return false
     for event in data["pending_events"]:
         if typeof(event) != TYPE_DICTIONARY:
+            return false
+        if not event.has("type") or not Catalog.EVENTS.has(str(event["type"])):
             return false
     if not _valid_integer(data["world_seed"], 1, 2147483647):
         return false
@@ -403,6 +564,76 @@ func _valid_core_values(data: Dictionary, resource_ids: Array) -> bool:
             if not _valid_drill_job(job, restored_depth, restored_drill_level):
                 return false
         elif not _valid_batch_job(facility, job):
+            return false
+    return true
+
+func _valid_discoveries(value: Variant) -> bool:
+    if typeof(value) != TYPE_DICTIONARY:
+        return false
+    for key in value:
+        if typeof(key) != TYPE_STRING or typeof(value[key]) != TYPE_DICTIONARY:
+            return false
+        var discovery: Dictionary = value[key]
+        if not _has_exact_keys(discovery, ["id", "depth", "slot", "type", "kind", "hint", "quality", "reward", "state", "active"]):
+            return false
+        if str(discovery["id"]) != str(key):
+            return false
+        if not _valid_integer(discovery["depth"], 0) or int(discovery["depth"]) % 10 != 0:
+            return false
+        if not _valid_integer(discovery["slot"], 0):
+            return false
+        var type_id := str(discovery["type"])
+        if not Catalog.POCKET_TYPES.has(type_id):
+            return false
+        var definition: Dictionary = Catalog.POCKET_TYPES[type_id]
+        if str(discovery["kind"]) != str(definition["kind"]) or typeof(discovery["hint"]) != TYPE_STRING:
+            return false
+        if not _finite_number(discovery["quality"]) or float(discovery["quality"]) < 0.0 or float(discovery["quality"]) > 1.0:
+            return false
+        if typeof(discovery["reward"]) != TYPE_DICTIONARY:
+            return false
+        if str(discovery["state"]) not in ["detected", "exploring", "exhausted", "opened"]:
+            return false
+        if typeof(discovery["active"]) != TYPE_BOOL:
+            return false
+    return true
+
+func _valid_permanent_sites(value: Variant) -> bool:
+    if typeof(value) != TYPE_DICTIONARY:
+        return false
+    for key in value:
+        if typeof(key) != TYPE_STRING or typeof(value[key]) != TYPE_DICTIONARY:
+            return false
+        var site: Dictionary = value[key]
+        if not _has_exact_keys(site, ["type", "active", "capacity", "depth", "level", "rate"]):
+            return false
+        var type_id := str(site["type"])
+        if not Catalog.POCKET_TYPES.has(type_id) or str(Catalog.POCKET_TYPES[type_id]["kind"]) != "permanent":
+            return false
+        if typeof(site["active"]) != TYPE_BOOL:
+            return false
+        if not _valid_integer(site["capacity"], 0) or int(site["capacity"]) != int(Catalog.POCKET_TYPES[type_id]["capacity"]):
+            return false
+        if not _valid_integer(site["depth"], 0) or int(site["depth"]) % 10 != 0:
+            return false
+        if not _valid_integer(site["level"], 1):
+            return false
+        if not _finite_number(site["rate"]) or float(site["rate"]) < 0.0:
+            return false
+    return true
+
+func _valid_explorations(value: Variant, discovery_map: Dictionary) -> bool:
+    if typeof(value) != TYPE_DICTIONARY:
+        return false
+    for key in value:
+        if typeof(key) != TYPE_STRING or typeof(value[key]) != TYPE_DICTIONARY:
+            return false
+        if not discovery_map.has(key) or str(discovery_map[key].get("state", "")) != "exploring":
+            return false
+        var exploration: Dictionary = value[key]
+        if not _has_exact_keys(exploration, ["discovery_id", "remaining", "duration"]):
+            return false
+        if str(exploration["discovery_id"]) != str(key) or not _valid_job_times(exploration):
             return false
     return true
 
