@@ -84,10 +84,10 @@ func _draw() -> void:
     var height := size.y
     draw_rect(Rect2(Vector2.ZERO, size), Color("101923"))
 
-    _draw_zone(0.0, 60.0, Color("343b40"))
-    _draw_zone(60.0, 90.0, Color("252f38"))
-    _draw_zone(90.0, 150.0, Color("1b2933"))
-    _draw_zone(150.0, maxf(220.0, scroll_depth + 120.0), Color("14212b"))
+    _draw_zone(0.0, 60.0, Style.ROCK_SHALLOW)
+    _draw_zone(60.0, 90.0, Style.ROCK_DENSE)
+    _draw_zone(90.0, 150.0, Style.ROCK_CRYSTAL)
+    _draw_zone(150.0, maxf(220.0, scroll_depth + 120.0), Style.ROCK_DEEP)
 
     var surface_y := _depth_to_y(0.0)
     if surface_y > -80.0 and surface_y < height + 80.0:
@@ -102,7 +102,7 @@ func _draw() -> void:
             continue
         var line_color := Color("54707d")
         if horizon >= 90:
-            line_color = Color("39aab7")
+            line_color = Style.CRYSTAL_CYAN
         draw_line(Vector2(14, y), Vector2(width - 14, y), line_color, 1.0)
         draw_string(ThemeDB.fallback_font, Vector2(18, y - 7), "−%d m" % horizon, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Style.MUTED)
 
@@ -137,7 +137,7 @@ func _draw_surface_modules(surface_y: float) -> void:
     for index in range(4):
         var x: float = start_x + index * (module_w + gap)
         draw_rect(Rect2(x, base_y - 30.0, module_w, 30.0), colors[index])
-        draw_rect(Rect2(x + 7.0, base_y - 22.0, module_w - 14.0, 7.0), Color("d0a06a"))
+        draw_rect(Rect2(x + 7.0, base_y - 22.0, module_w - 14.0, 7.0), Style.INDUSTRIAL_AMBER)
 
 func _draw_crystal_signatures() -> void:
     var widths: Array[float] = [0.18, 0.78, 0.28, 0.70]
@@ -153,7 +153,7 @@ func _draw_crystal_signatures() -> void:
             Vector2(x, y + 14),
             Vector2(x - 7, y + 5),
         ])
-        draw_colored_polygon(points, Color("44d9d2"))
+        draw_colored_polygon(points, Style.CRYSTAL_CYAN)
 
 func _rebuild_targets() -> void:
     for target in _targets:
@@ -170,7 +170,10 @@ func _rebuild_targets() -> void:
         var x_ratio: float = ratios[index % 3]
         _add_target("Mine_" + id, "mine", id, Vector2(size.x * x_ratio, _depth_to_y(12.0)), Catalog.RESOURCES[id]["label"])
 
-    _add_target("Drill", "drill", "drill", Vector2(size.x * 0.5, _depth_to_y(float(session.game.depth) + 7.0)), "Foreuse")
+    var drill_center := Vector2(size.x * 0.5, _depth_to_y(float(session.game.depth) + 7.0))
+    _add_target("Drill", "drill", "drill", drill_center, "Foreuse")
+    if session.game.jobs.has("drill"):
+        _add_timer("Timer_Drill", session.game.jobs["drill"], drill_center + Vector2(0, 38))
 
     var discovery_ids: Array = session.game.discoveries.keys()
     discovery_ids.sort()
@@ -178,15 +181,21 @@ func _rebuild_targets() -> void:
         var discovery: Dictionary = session.game.discoveries[discovery_id]
         var slot := int(discovery.get("slot", 0))
         var x: float = size.x * (0.24 if slot % 2 == 0 else 0.76)
+        var center := Vector2(x, _depth_to_y(float(discovery.get("depth", 0))))
         var label := str(discovery.get("hint", "Découverte"))
-        _add_target("Discovery_" + str(discovery_id).replace(":", "_"), "discovery", str(discovery_id), Vector2(x, _depth_to_y(float(discovery.get("depth", 0)))), label)
+        _add_target("Discovery_" + str(discovery_id).replace(":", "_"), "discovery", str(discovery_id), center, label)
+        if session.game.explorations.has(discovery_id):
+            _add_timer("Timer_Exploration_" + str(discovery_id).replace(":", "_"), session.game.explorations[discovery_id], center + Vector2(0, 38))
 
     var site_ids: Array = session.game.permanent_sites.keys()
     site_ids.sort()
     for site_id in site_ids:
         var site: Dictionary = session.game.permanent_sites[site_id]
         var x: float = size.x * 0.76
-        _add_target("Site_" + str(site_id).replace(":", "_"), "site", str(site_id), Vector2(x, _depth_to_y(float(site.get("depth", 0)))), "Site")
+        var center := Vector2(x, _depth_to_y(float(site.get("depth", 0))))
+        _add_target("Site_" + str(site_id).replace(":", "_"), "site", str(site_id), center, "Site")
+        if bool(site.get("active", false)):
+            _add_site_status("Status_Site_" + str(site_id).replace(":", "_"), site, center + Vector2(0, 38))
 
 func _add_target(node_name: String, kind: String, id: String, center: Vector2, title: String) -> void:
     var button := Button.new()
@@ -200,6 +209,42 @@ func _add_target(node_name: String, kind: String, id: String, center: Vector2, t
     button.pressed.connect(_emit_selection.bind(kind, id))
     add_child(button)
     _targets.append(button)
+
+func _add_timer(node_name: String, job: Dictionary, center: Vector2) -> void:
+    var container := VBoxContainer.new()
+    container.name = node_name
+    container.custom_minimum_size = Vector2(112, 28)
+    container.size = Vector2(112, 32)
+    container.position = Vector2(clampf(center.x - 56.0, 4.0, maxf(4.0, size.x - 116.0)), center.y - 14.0)
+    container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    var label := Label.new()
+    label.text = _duration(float(job.get("remaining", 0.0)))
+    label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    label.add_theme_font_size_override("font_size", 11)
+    label.add_theme_color_override("font_color", Style.ACCENT)
+    container.add_child(label)
+    var progress := ProgressBar.new()
+    progress.custom_minimum_size.y = 5
+    progress.show_percentage = false
+    var duration := maxf(float(job.get("duration", 1.0)), 0.001)
+    progress.value = 100.0 * (1.0 - float(job.get("remaining", 0.0)) / duration)
+    container.add_child(progress)
+    add_child(container)
+    _targets.append(container)
+
+func _add_site_status(node_name: String, site: Dictionary, center: Vector2) -> void:
+    var label := Label.new()
+    label.name = node_name
+    label.text = "ACTIF · %.2f/min" % (float(site.get("rate", 0.0)) * 60.0)
+    label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    label.add_theme_font_size_override("font_size", 11)
+    label.add_theme_color_override("font_color", Style.CRYSTAL_CYAN)
+    label.custom_minimum_size = Vector2(112, 22)
+    label.size = Vector2(112, 22)
+    label.position = Vector2(clampf(center.x - 56.0, 4.0, maxf(4.0, size.x - 116.0)), center.y - 11.0)
+    label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    add_child(label)
+    _targets.append(label)
 
 func _emit_selection(kind: String, id: String) -> void:
     selection_changed.emit(kind, id)
@@ -216,3 +261,7 @@ func _max_scroll_depth() -> float:
         for site in session.game.permanent_sites.values():
             deepest = maxf(deepest, float(site.get("depth", 0)) + 40.0)
     return maxf(0.0, deepest - 35.0)
+
+func _duration(seconds: float) -> String:
+    var rounded := ceili(maxf(0.0, seconds))
+    return "%d:%02d" % [rounded / 60, rounded % 60]
