@@ -5,6 +5,7 @@ const PROFILE_PATH := "res://src/view/terrain_visual_profile.gd"
 func run(t: TestSupport) -> void:
     test_profile(t)
     test_renderer_coordinate_conversion(t)
+    test_observer_surface_merging(t)
 
 func test_profile(t: TestSupport) -> void:
     var exists := ResourceLoader.exists(PROFILE_PATH)
@@ -38,4 +39,21 @@ func test_renderer_coordinate_conversion(t: TestSupport) -> void:
         return
     t.equal(renderer.call("cell_from_local", Vector2(0.0, 0.0)), Vector2i(0, 0), "origine vers cellule 0,0")
     t.equal(renderer.call("cell_from_local", Vector2(31.9, 48.1)), Vector2i(1, 3), "conversion locale respecte CELL_SIZE")
+    renderer.free()
+
+func test_observer_surface_merging(t: TestSupport) -> void:
+    var renderer := TerrainRenderer.new()
+    var has_api := renderer.has_method("observer_fill_color")
+    t.equal(has_api, true, "renderer expose remplissage Observer fusionné")
+    if not has_api:
+        renderer.free()
+        return
+
+    var common_a: Color = renderer.call("observer_fill_color", Vector2i(2, 2), &"rock_common")
+    var common_b: Color = renderer.call("observer_fill_color", Vector2i(47, 38), &"rock_common")
+    var dense_a: Color = renderer.call("observer_fill_color", Vector2i(5, 9), &"rock_dense")
+    var dense_b: Color = renderer.call("observer_fill_color", Vector2i(51, 61), &"rock_dense")
+
+    t.equal(common_a, common_b, "roche commune sans damier en Observer")
+    t.equal(dense_a, dense_b, "roche dense sans damier en Observer")
     renderer.free()
