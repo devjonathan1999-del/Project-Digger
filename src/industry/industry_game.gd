@@ -38,13 +38,13 @@ var pending_events: Array = []
 var world_seed: int = 1
 
 func advance(seconds: float) -> Dictionary:
-    var report := {"produced": {}, "completed": [], "depth_gained": 0}
+    var report := {"produced": {}, "completed": [], "depth_gained": 0, "events_expired": []}
     if not is_finite(seconds) or seconds <= 0.0:
         return report
 
     var elapsed_remaining := seconds
     while elapsed_remaining > 0.0:
-        if jobs.is_empty() and explorations.is_empty():
+        if jobs.is_empty() and explorations.is_empty() and active_event.is_empty():
             _advance_for_duration(elapsed_remaining, report["produced"])
             break
 
@@ -53,12 +53,16 @@ func advance(seconds: float) -> Dictionary:
             segment = minf(segment, float(job["remaining"]))
         for exploration in explorations.values():
             segment = minf(segment, float(exploration["remaining"]))
+        if not active_event.is_empty():
+            segment = minf(segment, float(active_event["remaining"]))
 
         _advance_for_duration(segment, report["produced"])
         for job in jobs.values():
             job["remaining"] = maxf(0.0, float(job["remaining"]) - segment)
         for exploration in explorations.values():
             exploration["remaining"] = maxf(0.0, float(exploration["remaining"]) - segment)
+        if not active_event.is_empty():
+            active_event["remaining"] = maxf(0.0, float(active_event["remaining"]) - segment)
         elapsed_remaining -= segment
 
         for facility in FACILITIES:
@@ -87,6 +91,10 @@ func advance(seconds: float) -> Dictionary:
         for discovery_id in finished_explorations:
             explorations.erase(discovery_id)
             _complete_exploration(discovery_id, report["produced"])
+
+        if not active_event.is_empty() and float(active_event["remaining"]) <= 0.0:
+            report["events_expired"].append(str(active_event["type"]))
+            active_event = {}
 
     return report
 
@@ -336,6 +344,35 @@ func set_priority(branch: String) -> bool:
     priority_cooldown_remaining = PRIORITY_COOLDOWN_SECONDS
     return true
 
+func present_pending_event() -> bool:
+    if not active_event.is_empty() or pending_events.is_empty():
+        return false
+    var pending = pending_events.pop_front()
+    if typeof(pending) != TYPE_DICTIONARY:
+        return false
+    var type_id := str(pending.get("type", ""))
+    if not Catalog.EVENTS.has(type_id):
+        return false
+    var duration := float(Catalog.EVENTS[type_id]["duration"])
+    active_event = {
+        "type": type_id,
+        "remaining": duration,
+        "duration": duration,
+        "resource": "",
+    }
+    return true
+
+func choose_event_resource(resource_id: String) -> bool:
+    if active_event.is_empty():
+        return false
+    var type_id := str(active_event.get("type", ""))
+    if not Catalog.EVENTS.has(type_id):
+        return false
+    if resource_id not in Catalog.EVENTS[type_id]["choices"]:
+        return false
+    active_event["resource"] = resource_id
+    return true
+
 func can_afford(cost: Dictionary) -> bool:
     for id in cost:
         if not resources.has(id) or not _finite_number(resources[id]) or not _finite_number(cost[id]) or float(cost[id]) < 0.0:
@@ -348,7 +385,12 @@ func mine_rate(id: String) -> float:
     if not Catalog.MINES.has(id) or not mine_levels.has(id):
         return 0.0
     var depth_bonus := 1.0 + 0.15 * floori(float(depth) / 30.0)
-    return float(Catalog.MINES[id]["base_rate"]) * int(mine_levels[id]) * depth_bonus * production_multiplier()
+    var event_multiplier := 1.0
+    if not active_event.is_empty() and str(active_event.get("resource", "")) == id:
+        var event_type := str(active_event.get("type", ""))
+        if Catalog.EVENTS.has(event_type):
+            event_multiplier += float(Catalog.EVENTS[event_type].get("rate_bonus", 0.0))
+    return float(Catalog.MINES[id]["base_rate"]) * int(mine_levels[id]) * depth_bonus * production_multiplier() * event_multiplier
 
 func mine_upgrade_cost(id: String) -> Dictionary:
     if not Catalog.MINES.has(id) or not mine_levels.has(id):
@@ -600,16 +642,40 @@ func _valid_snapshot(data: Dictionary) -> bool:
         return false
     if not _finite_number(data["priority_cooldown_remaining"]) or float(data["priority_cooldown_remaining"]) < 0.0:
         return false
-    if typeof(data["active_event"]) != TYPE_DICTIONARY or typeof(data["pending_events"]) != TYPE_ARRAY:
+    if not _valid_active_event(data["active_event"]):
+        return false
+    if typeof(data["pending_events"]) != TYPE_ARRAY:
         return false
     for event in data["pending_events"]:
         if typeof(event) != TYPE_DICTIONARY:
             return false
-        if not event.has("type") or not Catalog.EVENTS.has(str(event["type"])):
+        if not _has_exact_keys(event, ["type", "presented"]):
+            return false
+        if not Catalog.EVENTS.has(str(event["type"])) or typeof(event["presented"]) != TYPE_BOOL:
             return false
     if not _valid_integer(data["world_seed"], 1, 2147483647):
         return false
     return true
+
+func _valid_active_event(value: Variant) -> bool:
+    if typeof(value) != TYPE_DICTIONARY:
+        return false
+    var event: Dictionary = value
+    if event.is_empty():
+        return true
+    if not _has_exact_keys(event, ["type", "remaining", "duration", "resource"]):
+        return false
+    var type_id := str(event["type"])
+    if not Catalog.EVENTS.has(type_id):
+        return false
+    if not _valid_job_times(event):
+        return false
+    if not is_equal_approx(float(event["duration"]), float(Catalog.EVENTS[type_id]["duration"])):
+        return false
+    if typeof(event["resource"]) != TYPE_STRING:
+        return false
+    var resource_id := str(event["resource"])
+    return resource_id == "" or resource_id in Catalog.EVENTS[type_id]["choices"]
 
 func _valid_v1_snapshot(data: Dictionary) -> bool:
     if not _has_exact_keys(data, ["resources", "mine_levels", "drill_level", "depth", "jobs"]):
