@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/digger-v0.1
+      - main
   workflow_dispatch:
 
 jobs:
