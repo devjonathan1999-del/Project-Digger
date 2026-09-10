@@ -11,6 +11,7 @@ const TEST_SUITES := [
     preload("res://tests/test_terrain_visual_profile.gd"),
     preload("res://tests/test_ui_contract.gd"),
     preload("res://tests/test_scene_contract.gd"),
+    preload("res://tests/test_feedback_classifier.gd"),
     preload("res://tests/test_vertical_slice_acceptance.gd"),
 ]
 
@@ -28,6 +29,4 @@ func _initialize() -> void:
     call_deferred("_finish_and_quit")
 
 func _finish_and_quit() -> void:
-    # Leave _initialize() first so temporary GDScript references are released
-    # before SceneTree shutdown checks ObjectDB/resource ownership.
     quit(_exit_code)
