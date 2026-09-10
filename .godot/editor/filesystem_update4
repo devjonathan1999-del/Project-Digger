@@ -1,0 +1,11 @@
+res://src/vertical_slice.gd
+res://src/content/vertical_slice_layout.gd
+res://src/input/game_input.gd
+res://src/save/save_system.gd
+res://src/terrain/stability_system.gd
+res://src/ui/hud.gd
+res://src/view/terrain_renderer.gd
+res://tests/test_runner.gd
+res://tests/test_save_system.gd
+res://tests/test_stability_system.gd
+res://tests/test_vertical_slice_acceptance.gd
