@@ -92,6 +92,14 @@ func start_excavation() -> bool:
     changed.emit()
     return true
 
+func present_pending_event() -> bool:
+    advance_to(Time.get_unix_time_from_system())
+    if not game.present_pending_event():
+        return false
+    persist()
+    changed.emit()
+    return true
+
 func _process(delta: float) -> void:
     advance_to(Time.get_unix_time_from_system())
     if not is_finite(delta) or delta <= 0.0:
