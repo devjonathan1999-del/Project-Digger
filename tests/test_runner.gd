@@ -9,6 +9,7 @@ const TEST_SUITES := [
     preload("res://tests/test_simulation_controller.gd"),
     preload("res://tests/test_save_system.gd"),
     preload("res://tests/test_terrain_visual_profile.gd"),
+    preload("res://tests/test_ui_contract.gd"),
     preload("res://tests/test_vertical_slice_acceptance.gd"),
 ]
 
