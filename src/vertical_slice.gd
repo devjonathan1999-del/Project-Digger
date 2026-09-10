@@ -17,7 +17,7 @@ func _ready() -> void:
 	_layout_data = VerticalSliceLayout.new().build()
 	model = _layout_data["model"]
 
-	var saved := _save_system.load_default()
+	var saved := _save_system.load_default_for_content(VerticalSliceLayout.CONTENT_ID)
 	if not saved.is_empty():
 		model.restore(saved["terrain"])
 		_objective_reached = bool(saved.get("objective_reached", false))
@@ -137,6 +137,7 @@ func _autosave() -> void:
 		"relay_connected": controller.relay_connected,
 		"cycle_state": controller.state,
 		"objective_reached": _objective_reached,
+		"content_id": VerticalSliceLayout.CONTENT_ID,
 	})
 	if not saved:
 		push_error("Project Digger: autosave failed")
