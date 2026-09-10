@@ -61,40 +61,44 @@ func persist() -> bool:
     return true
 
 func start_batch(recipe: String, quantity: int) -> bool:
-    advance_to(Time.get_unix_time_from_system())
-    if not game.start_batch(recipe, quantity):
-        return false
-    persist()
-    changed.emit()
-    return true
+    return _apply_action(Callable(game, "start_batch").bind(recipe, quantity))
 
 func upgrade_mine(id: String) -> bool:
-    advance_to(Time.get_unix_time_from_system())
-    if not game.upgrade_mine(id):
-        return false
-    persist()
-    changed.emit()
-    return true
+    return _apply_action(Callable(game, "upgrade_mine").bind(id))
 
 func upgrade_drill() -> bool:
-    advance_to(Time.get_unix_time_from_system())
-    if not game.upgrade_drill():
-        return false
-    persist()
-    changed.emit()
-    return true
+    return _apply_action(Callable(game, "upgrade_drill"))
 
 func start_excavation() -> bool:
-    advance_to(Time.get_unix_time_from_system())
-    if not game.start_excavation():
-        return false
-    persist()
-    changed.emit()
-    return true
+    return _apply_action(Callable(game, "start_excavation"))
+
+func upgrade_center() -> bool:
+    return _apply_action(Callable(game, "upgrade_center"))
+
+func start_exploration(id: String) -> bool:
+    return _apply_action(Callable(game, "start_exploration").bind(id))
+
+func set_site_active(id: String, active: bool) -> bool:
+    return _apply_action(Callable(game, "set_site_active").bind(id, active))
+
+func unlock_technology(id: String) -> bool:
+    return _apply_action(Callable(game, "unlock_technology").bind(id))
+
+func build_technology(id: String) -> bool:
+    return _apply_action(Callable(game, "build_technology").bind(id))
+
+func set_priority(branch: String) -> bool:
+    return _apply_action(Callable(game, "set_priority").bind(branch))
 
 func present_pending_event() -> bool:
+    return _apply_action(Callable(game, "present_pending_event"))
+
+func choose_event_resource(id: String) -> bool:
+    return _apply_action(Callable(game, "choose_event_resource").bind(id))
+
+func _apply_action(callable: Callable) -> bool:
     advance_to(Time.get_unix_time_from_system())
-    if not game.present_pending_event():
+    if not callable.call():
         return false
     persist()
     changed.emit()
