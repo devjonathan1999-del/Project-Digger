@@ -26,14 +26,36 @@ jobs:
           chmod +x Godot_v4.7.2-stable_linux.x86_64
           ./Godot_v4.7.2-stable_linux.x86_64 --version
 
+      - name: Initialize clean Godot project cache
+        shell: bash
+        run: |
+          set +e
+          OUTPUT=$(timeout 60s ./Godot_v4.7.2-stable_linux.x86_64 --headless --editor --path . --quit 2>&1)
+          STATUS=$?
+          set -e
+          printf '%s\n' "$OUTPUT"
+          if [ "$STATUS" -eq 124 ]; then
+            echo '::error::Godot project initialization timed out'
+            exit 1
+          fi
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR: Failed to load script' <<< "$OUTPUT"; then
+            echo '::error::Godot script or parse error detected during clean project initialization'
+            exit 1
+          fi
+          exit "$STATUS"
+
       - name: Run headless test suite
         shell: bash
         run: |
           set +e
-          OUTPUT=$(./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_runner.gd 2>&1)
+          OUTPUT=$(timeout 60s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_runner.gd 2>&1)
           STATUS=$?
           set -e
           printf '%s\n' "$OUTPUT"
+          if [ "$STATUS" -eq 124 ]; then
+            echo '::error::Godot test suite timed out'
+            exit 1
+          fi
           if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR: Failed to load script' <<< "$OUTPUT"; then
             echo '::error::Godot script or parse error detected'
             exit 1
