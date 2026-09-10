@@ -2,11 +2,18 @@ class_name GameCamera
 extends Camera2D
 
 @export var pan_speed := 460.0
-@export var min_zoom := 0.6
-@export var max_zoom := 2.0
+@export var min_zoom := 0.9
+@export var max_zoom := 2.2
 @export var zoom_step := 1.12
 
 var _dragging := false
+
+func configure_bounds(world_size: Vector2i, cell_size: int) -> void:
+    limit_left = 0
+    limit_top = 0
+    limit_right = world_size.x * cell_size
+    limit_bottom = world_size.y * cell_size
+    limit_smoothed = false
 
 func set_focus_cell(cell: Vector2i, cell_size: int) -> void:
     var half_cell := float(cell_size) * 0.5
