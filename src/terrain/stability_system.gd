@@ -52,7 +52,11 @@ func resolve(model: TerrainModel, max_iterations: int = 128) -> Array[Dictionary
                     continue
                 model.set_cell(from, null)
                 model.set_cell(to, cell)
-                movements.append({"from": from, "to": to})
+                movements.append({
+                    "from": from,
+                    "to": to,
+                    "material_id": cell.material_id,
+                })
                 moved = true
         if not moved:
             break
