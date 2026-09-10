@@ -134,7 +134,7 @@ func _cell_polygon(pos: Vector2i) -> PackedVector2Array:
     ])
 
 func _surface_wobble(pos: Vector2i, salt: int) -> int:
-    var value := abs(pos.x * 92821 + pos.y * 68917 + salt * 283)
+    var value: int = absi(pos.x * 92821 + pos.y * 68917 + salt * 283)
     return value % 3
 
 func _draw_outline(polygon: PackedVector2Array, color: Color, width: float) -> void:
