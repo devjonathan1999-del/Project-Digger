@@ -24,4 +24,4 @@ jobs:
       - name: Run headless test suite
         shell: bash
         run: |
-          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_runner.gd
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --verbose --path . -s res://tests/test_runner.gd
