@@ -43,6 +43,7 @@ func _ready() -> void:
 	terrain_renderer.set_model(model)
 	ancient_overlay.configure(_layout_data["ancient_path"], _layout_data["relay_pos"], TerrainRenderer.CELL_SIZE)
 	ancient_overlay.set_connected(controller.relay_connected)
+	game_camera.configure_bounds(Vector2i(model.width, model.height), TerrainRenderer.CELL_SIZE)
 	game_camera.set_focus_cell(_layout_data["spawn_focus"], TerrainRenderer.CELL_SIZE)
 	game_input.configure(terrain_renderer)
 	feedback.configure(game_camera, resolution_fx, ancient_overlay)
