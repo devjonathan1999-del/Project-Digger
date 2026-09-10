@@ -1,6 +1,7 @@
 class_name VerticalSliceLayout
 extends RefCounted
 
+const CONTENT_ID := "cave_v02_helix_01"
 const WIDTH := 64
 const HEIGHT := 72
 const CELL_SIZE := 16
