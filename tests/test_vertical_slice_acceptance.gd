@@ -9,13 +9,46 @@ func test_layout_acceptance(t: TestSupport) -> void:
     var model: TerrainModel = data["model"]
     var catalog := preload("res://src/core/material_catalog.gd").new()
 
-    t.equal(model.width, 64, "largeur vertical slice")
-    t.equal(model.height, 72, "hauteur vertical slice")
-    t.equal(data["spawn_focus"], Vector2i(22, 9), "spawn focus reste en coordonnées de cellule")
+    t.equal(model.width, 64, "largeur cave v0.2")
+    t.equal(model.height, 72, "hauteur cave v0.2")
+
+    var required_metadata := ["entrance_rect", "chamber_rect", "ancient_path"]
+    var metadata_complete := true
+    for key in required_metadata:
+        if not data.has(key):
+            metadata_complete = false
+            t.check(false, "métadonnée cave v0.2 présente: %s" % key)
+    if not metadata_complete:
+        return
+
+    var entrance_rect: Rect2i = data["entrance_rect"]
+    var chamber_rect: Rect2i = data["chamber_rect"]
+    var ancient_path: Array[Vector2i] = data["ancient_path"]
+
+    t.equal(entrance_rect, Rect2i(6, 5, 20, 12), "zone d'entrée contractuelle")
+    t.equal(chamber_rect, Rect2i(18, 22, 28, 36), "chambre centrale contractuelle")
+    t.equal(data["spawn_focus"], Vector2i(22, 12), "focus initial de la cave v0.2")
+    t.check(ancient_path.size() >= 12, "réseau ancien visuellement exploitable")
+    t.equal(ancient_path.front(), data["relay_source"], "chemin ancien commence à la source")
+    t.equal(ancient_path.back(), data["relay_pos"], "chemin ancien termine au relais")
+
+    var counts := {
+        &"rock_common": 0,
+        &"rock_fragile": 0,
+        &"rock_dense": 0,
+        &"stabilizer": 0,
+    }
+    for y in range(model.height):
+        for x in range(model.width):
+            var cell := model.get_cell(Vector2i(x, y))
+            if cell != null and counts.has(cell.material_id):
+                counts[cell.material_id] += 1
+    for material_id in counts.keys():
+        t.check(int(counts[material_id]) > 0, "matière présente: %s" % material_id)
 
     var entrance_has_diggable := false
-    for y in range(4, 13):
-        for x in range(model.width):
+    for y in range(entrance_rect.position.y, entrance_rect.end.y):
+        for x in range(entrance_rect.position.x, entrance_rect.end.x):
             var cell := model.get_cell(Vector2i(x, y))
             if cell != null:
                 var material := catalog.get_def(cell.material_id)
