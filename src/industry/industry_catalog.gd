@@ -8,7 +8,6 @@ const RESOURCES: Dictionary = {
     "iron_ingot": {"label": "Lingot de fer", "raw": false},
     "copper_ingot": {"label": "Lingot de cuivre", "raw": false},
     "cable": {"label": "Câble", "raw": false},
-    "crystal": {"label": "Cristal brut", "raw": true},
 }
 
 const MINES: Dictionary = {
