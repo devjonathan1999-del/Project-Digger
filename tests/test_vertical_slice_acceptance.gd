@@ -13,7 +13,7 @@ func test_layout_acceptance(t: TestSupport) -> void:
     var model: TerrainModel = data["model"]
     var catalog := preload("res://src/core/material_catalog.gd").new()
 
-    t.equal(VerticalSliceLayout.CONTENT_ID, "cave_v02_helix_01", "identifiant contenu v0.2 stable")
+    t.equal(VerticalSliceLayout.CONTENT_ID, "cave_v02_helix_02", "identifiant contenu Helix révisé")
     t.equal(model.width, 64, "largeur cave v0.2")
     t.equal(model.height, 72, "hauteur cave v0.2")
 
@@ -36,6 +36,9 @@ func test_layout_acceptance(t: TestSupport) -> void:
     t.check(ancient_path.size() >= 12, "réseau ancien visuellement exploitable")
     t.equal(ancient_path.front(), data["relay_source"], "chemin ancien commence à la source")
     t.equal(ancient_path.back(), data["relay_pos"], "chemin ancien termine au relais")
+
+    for shoulder in [Vector2i(8, 20), Vector2i(55, 20), Vector2i(9, 45), Vector2i(54, 44)]:
+        t.check(model.get_cell(shoulder) != null, "épaule géologique présente: %s" % shoulder)
 
     var counts := {
         &"rock_common": 0,
