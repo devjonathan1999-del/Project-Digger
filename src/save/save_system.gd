@@ -16,8 +16,9 @@ func save_to_path(path: String, model: TerrainModel, extra: Dictionary) -> bool:
         return false
 
     var cycle_state := int(extra.get("cycle_state", SimulationController.OBSERVER))
+    # A transient resolving state is a normal validation rejection, not an
+    # engine/runtime error. The caller receives false and decides what to do.
     if cycle_state != SimulationController.OBSERVER and cycle_state != SimulationController.PREPARE:
-        push_error("SaveSystem: refusing to persist transient RESOLVING state")
         return false
 
     var data := {
@@ -53,8 +54,9 @@ func load_from_path(path: String) -> Dictionary:
 
     var data: Dictionary = parsed
     var version := int(data.get("version", -1))
+    # A save from another schema version is an expected compatibility case.
+    # Reject it without polluting the engine error log.
     if version != SAVE_VERSION:
-        push_error("SaveSystem: unsupported save version %d (supported: %d)" % [version, SAVE_VERSION])
         return {}
 
     if not data.get("terrain", null) is Dictionary:
