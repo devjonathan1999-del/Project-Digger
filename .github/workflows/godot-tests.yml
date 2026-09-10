@@ -29,4 +29,13 @@ jobs:
       - name: Run headless test suite
         shell: bash
         run: |
-          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_runner.gd
+          set +e
+          OUTPUT=$(./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_runner.gd 2>&1)
+          STATUS=$?
+          set -e
+          printf '%s\n' "$OUTPUT"
+          if grep -Eq 'SCRIPT ERROR:|Parse Error:|ERROR: Failed to load script' <<< "$OUTPUT"; then
+            echo '::error::Godot script or parse error detected'
+            exit 1
+          fi
+          exit "$STATUS"
