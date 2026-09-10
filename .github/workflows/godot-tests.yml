@@ -25,7 +25,28 @@ jobs:
           chmod +x Godot_v4.7.2-stable_linux.x86_64
           ./Godot_v4.7.2-stable_linux.x86_64 --version
 
+      - name: Import project
+        shell: bash
+        run: |
+          set +e
+          timeout 90s ./Godot_v4.7.2-stable_linux.x86_64 --headless --editor --quit --path . 2>&1 | tee godot-import.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-import.log; then
+            exit 1
+          fi
+
       - name: Run headless test suite
         shell: bash
         run: |
-          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_runner.gd
+          set +e
+          timeout 90s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_runner.gd 2>&1 | tee godot-tests.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-tests.log; then
+            exit 1
+          fi

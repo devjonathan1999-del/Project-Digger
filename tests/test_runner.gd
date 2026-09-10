@@ -9,6 +9,9 @@ const TEST_SUITES := [
     preload("res://tests/test_simulation_controller.gd"),
     preload("res://tests/test_save_system.gd"),
     preload("res://tests/test_vertical_slice_acceptance.gd"),
+    preload("res://tests/test_industry_game.gd"),
+    preload("res://tests/test_industry_save.gd"),
+    preload("res://tests/test_industry_session.gd"),
 ]
 
 var _exit_code := 1
