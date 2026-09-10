@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/digger-v0.1
+      - feature/progression-v0.3
       - main
   pull_request:
     branches:
