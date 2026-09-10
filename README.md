@@ -50,6 +50,8 @@ Le runner renvoie `0` si toutes les assertions passent et `1` sinon.
 
 Après chaque résolution terminée, le terrain est sauvegardé dans `user://save_v1.json`. La sauvegarde est rechargée au prochain lancement.
 
+La nouvelle sauvegarde est écrite dans un fichier temporaire voisin avant de remplacer la précédente. Si cette écriture ou le remplacement échoue, la dernière sauvegarde validée est conservée ; un fichier temporaire incomplet est ignoré au chargement.
+
 Quand le corridor final est ouvert, le HUD affiche :
 
 `Accès aux profondeurs ouvert — Vertical slice terminé`

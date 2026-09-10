@@ -29,12 +29,28 @@ func save_to_path(path: String, model: TerrainModel, extra: Dictionary) -> bool:
         "objective_reached": bool(extra.get("objective_reached", false)),
     }
 
-    var file := FileAccess.open(path, FileAccess.WRITE)
+    # Keep the last committed save untouched until its replacement is complete.
+    # A sibling file keeps the final rename on the same filesystem.
+    var temp_path := path + ".tmp"
+    var file := FileAccess.open(temp_path, FileAccess.WRITE)
     if file == null:
-        push_error("SaveSystem: cannot open save path: %s" % path)
         return false
-    file.store_string(JSON.stringify(data))
+    var written := file.store_string(JSON.stringify(data))
+    file.flush()
+    var write_error := file.get_error()
     file.close()
+    if not written or write_error != OK:
+        DirAccess.remove_absolute(ProjectSettings.globalize_path(temp_path))
+        return false
+
+    # Never remove the destination first: a failed replacement must retain it.
+    var replace_error := DirAccess.rename_absolute(
+        ProjectSettings.globalize_path(temp_path),
+        ProjectSettings.globalize_path(path)
+    )
+    if replace_error != OK:
+        DirAccess.remove_absolute(ProjectSettings.globalize_path(temp_path))
+        return false
     return true
 
 func load_from_path(path: String) -> Dictionary:
