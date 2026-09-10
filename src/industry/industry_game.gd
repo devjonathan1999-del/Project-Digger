@@ -2,6 +2,7 @@ class_name IndustryGame
 extends RefCounted
 
 const Catalog = preload("res://src/industry/industry_catalog.gd")
+const Discovery = preload("res://src/industry/industry_discovery.gd")
 const FACILITIES: Array[String] = ["furnace", "workshop", "drill"]
 const V1_RESOURCE_IDS := ["iron", "coal", "copper", "iron_ingot", "copper_ingot", "cable"]
 const PRIORITY_BRANCHES := ["production", "logistics", "exploration"]
@@ -65,6 +66,8 @@ func advance(seconds: float) -> Dictionary:
                 var previous_depth := depth
                 depth = int(completed_job["target_depth"])
                 report["depth_gained"] += depth - previous_depth
+                _apply_milestones_up_to(depth)
+                _generate_depth_discoveries(depth)
             else:
                 var recipe: Dictionary = Catalog.RECIPES[completed_job["recipe"]]
                 var output: String = recipe["output"]
@@ -150,13 +153,20 @@ func restore_v1(data: Dictionary, seed: int) -> bool:
     return true
 
 func apply_retroactive_milestones() -> void:
-    for milestone_depth in Catalog.MILESTONES:
-        var milestone := int(milestone_depth)
-        if milestone > depth or milestone in claimed_milestones:
-            continue
-        tech_points += int(Catalog.MILESTONES[milestone].get("tech_points", 0))
-        claimed_milestones.append(milestone)
-    claimed_milestones.sort()
+    _apply_milestones_up_to(depth)
+    for generated_depth in range(30, depth + 1, 10):
+        _generate_depth_discoveries(generated_depth)
+
+func discoveries_for_depth(target_depth: int) -> Array:
+    var result: Array = []
+    for discovery in discoveries.values():
+        if int(discovery.get("depth", -1)) == target_depth:
+            result.append(discovery.duplicate(true))
+    result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("slot", 0)) < int(b.get("slot", 0)))
+    return result
+
+func quality_floor() -> float:
+    return 0.0
 
 func can_afford(cost: Dictionary) -> bool:
     for id in cost:
@@ -198,7 +208,10 @@ func batch_block_reason(recipe: String, quantity: int) -> String:
 func excavation_block_reason() -> String:
     if jobs.has("drill"):
         return "Foreuse occupée"
-    var required_level := mini(Catalog.MAX_DRILL_LEVEL, 1 + floori(float(depth + 10) / 30.0))
+    var target_depth := depth + 10
+    var required_level := mini(Catalog.MAX_DRILL_LEVEL, 1 + floori(float(target_depth) / 30.0))
+    if Catalog.MILESTONES.has(target_depth):
+        required_level = maxi(required_level, int(Catalog.MILESTONES[target_depth].get("requires_drill", 1)))
     if drill_level < required_level:
         return "Niveau de foreuse insuffisant"
     return ""
@@ -253,6 +266,26 @@ func start_excavation() -> bool:
         "duration": duration,
     }
     return true
+
+func _apply_milestones_up_to(target_depth: int) -> void:
+    for milestone_depth in Catalog.MILESTONES:
+        var milestone := int(milestone_depth)
+        if milestone > target_depth or milestone in claimed_milestones:
+            continue
+        tech_points += int(Catalog.MILESTONES[milestone].get("tech_points", 0))
+        claimed_milestones.append(milestone)
+    claimed_milestones.sort()
+
+func _generate_depth_discoveries(target_depth: int) -> void:
+    if not Discovery.should_generate(world_seed, target_depth, 0):
+        return
+    _ensure_discovery(target_depth, 0)
+
+func _ensure_discovery(target_depth: int, slot: int) -> void:
+    var id := "%d:%d" % [target_depth, slot]
+    if discoveries.has(id):
+        return
+    discoveries[id] = Discovery.generate(world_seed, target_depth, slot, quality_floor())
 
 func _produce_minerals(seconds: float, produced: Dictionary) -> void:
     for id in Catalog.MINES:
@@ -332,7 +365,7 @@ func _valid_snapshot(data: Dictionary) -> bool:
     for event in data["pending_events"]:
         if typeof(event) != TYPE_DICTIONARY:
             return false
-    if not _valid_integer(data["world_seed"], -9223372036854775807, 9223372036854775807) or int(data["world_seed"]) == 0:
+    if not _valid_integer(data["world_seed"], 1, 2147483647):
         return false
     return true
 
@@ -423,6 +456,8 @@ func _valid_drill_job(job: Dictionary, restored_depth: int, restored_drill_level
     if int(job["target_depth"]) != restored_depth + 10 or not _valid_job_times(job):
         return false
     var required_level := mini(Catalog.MAX_DRILL_LEVEL, 1 + floori(float(restored_depth + 10) / 30.0))
+    if Catalog.MILESTONES.has(restored_depth + 10):
+        required_level = maxi(required_level, int(Catalog.MILESTONES[restored_depth + 10].get("requires_drill", 1)))
     if restored_drill_level < required_level:
         return false
     for committed_level in range(required_level, restored_drill_level + 1):
