@@ -4,6 +4,7 @@ const Support = preload("res://tests/test_support.gd")
 const Save = preload("res://src/industry/industry_save.gd")
 const Game = preload("res://src/industry/industry_game.gd")
 const PATH := "user://tests/industry_ui.json"
+const INVALID_PATH := "user://tests/industry_ui_invalid.json"
 var t = Support.new()
 
 func _initialize() -> void:
@@ -60,17 +61,27 @@ func _run() -> void:
     t.equal(session.game.mine_levels["iron"], 2, "le bouton mine améliore le débit")
     t.equal(recipe.selected, 1, "la mise à jour conserve la recette sélectionnée")
     t.equal(int(quantity.value), 2, "la mise à jour conserve la quantité")
-    session.save_error = "Impossible d'écrire la sauvegarde industrielle"
-    session.notice_changed.emit()
+    t.check(_page_text(screen).contains("Progression enregistrée automatiquement"), "confirmation de sauvegarde en état normal")
+    # PATH is an existing file: attempting to create a child makes a real write fail.
+    session.save_path = PATH.path_join("retry.json")
+    t.check(not session.persist(), "échec réel d'écriture pour tester la notice temporaire")
+    t.check(not session.save_blocked, "échec temporaire distinct d'un chargement invalide")
     t.check(screen.find_child("SaveNotice", true, false).visible, "erreur de sauvegarde visible")
-    session.save_error = ""
-    session.notice_changed.emit()
+    t.check(_page_text(screen).contains("Nouvelle tentative"), "échec temporaire indique une nouvelle tentative")
+    t.check(not _page_text(screen).contains("Progression enregistrée automatiquement"), "échec d'écriture ne promet pas la sauvegarde")
+    session.save_path = PATH
+    t.check(session.persist(), "une nouvelle tentative réelle rétablit la sauvegarde")
+    t.check(not screen.find_child("SaveNotice", true, false).visible, "la notice disparaît après sauvegarde réussie")
+    t.check(_page_text(screen).contains("Progression enregistrée automatiquement"), "le pied de page normal revient après réussite")
     await _dimensions(screen, Vector2i(1280, 800), false)
     await _dimensions(screen, Vector2i(720, 1000), true)
     var args := OS.get_cmdline_user_args()
+    var folder := ""
     if "--screenshots" in args:
-        var folder: String = args[args.find("--screenshots") + 1]
+        folder = args[args.find("--screenshots") + 1]
         DirAccess.make_dir_recursive_absolute(folder)
+    await _invalid_load(screen, folder)
+    if folder != "":
         await _capture(screen, Vector2i(1280, 800), folder.path_join("industry-wide.png"))
         await _capture(screen, Vector2i(720, 1000), folder.path_join("industry-narrow.png"))
         await _capture(screen, Vector2i(720, 1000), folder.path_join("industry-narrow-workshops.png"), true)
@@ -79,6 +90,47 @@ func _run() -> void:
     DirAccess.remove_absolute(PATH)
     print("Industry UI: %s" % ("PASS" if t.failures == 0 else "FAIL"))
     quit(t.finish())
+
+
+func _page_text(screen: Control) -> String:
+    var texts := PackedStringArray()
+    for label in screen.find_children("*", "Label", true, false):
+        if label.visible:
+            texts.append(label.text)
+    return "\n".join(texts)
+
+func _invalid_load(normal_screen: Control, folder: String) -> void:
+    var original := "{sauvegarde industrielle interrompue\n".to_utf8_buffer()
+    var file := FileAccess.open(INVALID_PATH, FileAccess.WRITE)
+    file.store_buffer(original)
+    file.close()
+    var blocked_screen = load("res://scenes/industry.tscn").instantiate()
+    var blocked_session = blocked_screen.get_node("IndustrySession")
+    blocked_session.save_path = INVALID_PATH
+    normal_screen.hide()
+    root.add_child(blocked_screen)
+    blocked_session.set_process(false)
+    await process_frame
+    await process_frame
+    t.check(blocked_session.save_blocked, "le vrai chargement invalide bloque l'enregistrement")
+    var notice = blocked_screen.find_child("SaveNotice", true, false)
+    t.check(notice.visible, "la sauvegarde invalide affiche sa notice")
+    t.check(notice.text.contains("sauvegarde d'origine est préservée"), "la notice confirme la préservation du fichier original")
+    t.check(notice.text.contains("progression de cette session provisoire ne sera pas enregistrée"), "la notice explique la perte de progression provisoire")
+    t.check(not _page_text(blocked_screen).contains("Progression enregistrée automatiquement"), "le pied de page bloqué ne promet pas la sauvegarde")
+    t.check(_page_text(blocked_screen).contains("Enregistrement désactivé"), "le pied de page reflète le blocage")
+    await _click(blocked_screen.find_child("FurnaceStart", true, false))
+    t.check(blocked_session.game.jobs.has("furnace"), "la session provisoire reste jouable")
+    t.check(not blocked_session.persist(), "aucun enregistrement de la session provisoire")
+    t.equal(FileAccess.get_file_as_bytes(INVALID_PATH), original, "les octets invalides sont préservés après action")
+    if folder != "":
+        await _capture(blocked_screen, Vector2i(720, 1000), folder.path_join("industry-save-blocked.png"))
+    blocked_screen.queue_free()
+    await process_frame
+    t.equal(FileAccess.get_file_as_bytes(INVALID_PATH), original, "les octets invalides sont préservés à la fermeture")
+    DirAccess.remove_absolute(INVALID_PATH)
+    normal_screen.show()
+    t.check(_page_text(normal_screen).contains("Progression enregistrée automatiquement"), "la session normale reste correctement affichée après la capture bloquée")
 
 func _click(button: Button) -> void:
     var scroll = button.find_parent("PageScroll") as ScrollContainer

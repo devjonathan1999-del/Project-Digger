@@ -23,6 +23,7 @@ var _dig_info: Label
 var _dig_progress: ProgressBar
 var _offline: Label
 var _save_notice: Label
+var _save_status: Label
 
 func _ready() -> void:
     session = get_node("IndustrySession")
@@ -126,7 +127,8 @@ func _build() -> void:
     _label(help, "CAP SUR LE PROCHAIN HORIZON", 14, Style.ACCENT)
     _label(help, "Les mines produisent en continu. Lance des lots pour préparer ta prochaine amélioration.", 15, Style.MUTED)
     _label(help, "Chaque palier de 30 m augmente le débit des mines de 15 %. Une foreuse renforcée ouvre les horizons suivants.", 14, Style.MUTED)
-    _label(page, "Progression enregistrée automatiquement · Les mines restent actives pendant ton absence.", 13, Style.MUTED)
+    _save_status = _label(page, "", 13, Style.MUTED)
+    _save_status.name = "SaveStatus"
 
 func _build_factory(facility: String, title: String, recipes: Array, prefix: String) -> void:
     var box := _card(_factory_row)
@@ -204,8 +206,16 @@ func _refresh() -> void:
     _overview.set_progress(game.depth, game.drill_level, game.jobs.get("drill", {}))
 
 func _refresh_notices() -> void:
-    _save_notice.visible = session.save_error != ""
-    _save_notice.text = "Sauvegarde : " + session.save_error
+    _save_notice.visible = session.save_blocked or session.save_error != ""
+    if session.save_blocked:
+        _save_notice.text = "Sauvegarde : %s\nLa sauvegarde d'origine est préservée. La progression de cette session provisoire ne sera pas enregistrée." % session.save_error
+        _save_status.text = "Enregistrement désactivé · Session provisoire."
+    elif session.save_error != "":
+        _save_notice.text = "Sauvegarde : %s\nNouvelle tentative automatique. La progression récente n'est pas encore enregistrée." % session.save_error
+        _save_status.text = "Enregistrement en attente · Nouvelle tentative automatique."
+    else:
+        _save_notice.text = ""
+        _save_status.text = "Progression enregistrée automatiquement · Les mines restent actives pendant ton absence."
     _offline.visible = session.offline_seconds >= 5.0
     if _offline.visible:
         var report: Dictionary = session.offline_report

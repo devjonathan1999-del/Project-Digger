@@ -7,6 +7,8 @@ const TEMP_PATH := PATH + ".tmp"
 
 func run(t: TestSupport) -> void:
     test_offline_progress_is_applied_once(t)
+    test_drill_upgrade_during_excavation_survives_reload(t)
+    test_affordability_never_spends_below_zero(t)
     test_clock_rollback_keeps_saved_instant(t)
     test_invalid_files_are_preserved(t)
     test_failed_staging_write_preserves_save(t)
@@ -31,6 +33,54 @@ func test_offline_progress_is_applied_once(t: TestSupport) -> void:
     var reopened: Dictionary = save.load_game(PATH, 1060.0)
     t.equal(reopened["offline_seconds"], 0.0, "aucune seconde rejouée")
     t.equal(reopened["game"].snapshot(), result["game"].snapshot(), "aucun double gain")
+    _cleanup()
+
+func test_drill_upgrade_during_excavation_survives_reload(t: TestSupport) -> void:
+    _cleanup()
+    var game = IndustryGameScript.new()
+    t.check(game.start_excavation(), "forage enregistré avant amélioration")
+    game.advance(5.0)
+    var committed_job: Dictionary = game.jobs["drill"].duplicate(true)
+    game.resources["iron_ingot"] = 2.0
+    game.resources["cable"] = 1.0
+    t.check(game.upgrade_drill(), "foreuse améliorée pendant le forage")
+    t.equal(game.jobs["drill"], committed_job, "amélioration conserve le minuteur engagé")
+
+    var save = IndustrySaveScript.new()
+    t.check(save.save_game(PATH, game, 1000.0), "forage amélioré sauvegardé")
+    var loaded: Dictionary = save.load_game(PATH, 1025.0)
+    t.equal(loaded["error"], "", "forage amélioré restauré")
+    t.equal(loaded["offline_report"]["completed"], ["drill"], "forage restauré terminé une fois")
+    t.equal(loaded["game"].depth, 10, "forage restauré gagne sa profondeur")
+    t.equal(loaded["game"].jobs.has("drill"), false, "forage terminé retiré")
+
+    t.check(save.save_game(PATH, loaded["game"], 1025.0), "état terminé sauvegardé")
+    var reopened: Dictionary = save.load_game(PATH, 1025.0)
+    t.equal(reopened["error"], "", "état terminé rouvert")
+    t.equal(reopened["offline_report"]["completed"], [], "forage non crédité deux fois")
+    t.equal(reopened["game"].depth, 10, "profondeur créditée une seule fois")
+    _cleanup()
+
+func test_affordability_never_spends_below_zero(t: TestSupport) -> void:
+    _cleanup()
+    var game = IndustryGameScript.new()
+    game.resources["iron"] = 3.9999999
+    game.resources["coal"] = 1.0
+    var insufficient: Dictionary = game.snapshot()
+    t.equal(game.start_batch("iron_ingot", 1), false, "stock juste insuffisant refusé")
+    t.equal(game.snapshot(), insufficient, "refus limite sans ressource négative")
+
+    var exact = IndustryGameScript.new()
+    exact.resources["iron"] = 4.0
+    exact.resources["coal"] = 1.0
+    t.check(exact.start_batch("iron_ingot", 1), "stock exact accepté")
+    t.equal(exact.resources["iron"], 0.0, "stock exact dépensé sans création")
+    t.equal(exact.resources["coal"], 0.0, "second intrant exact dépensé")
+    var save = IndustrySaveScript.new()
+    t.check(save.save_game(PATH, exact, 1000.0), "résultat limite sauvegardé")
+    var loaded: Dictionary = save.load_game(PATH, 1000.0)
+    t.equal(loaded["error"], "", "résultat limite restauré")
+    t.equal(loaded["game"].snapshot(), exact.snapshot(), "résultat limite persistant intact")
     _cleanup()
 
 func test_clock_rollback_keeps_saved_instant(t: TestSupport) -> void:

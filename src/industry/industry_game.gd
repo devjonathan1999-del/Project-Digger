@@ -94,9 +94,9 @@ func restore(data: Dictionary) -> bool:
 
 func can_afford(cost: Dictionary) -> bool:
     for id in cost:
-        if not resources.has(id) or not _finite_number(cost[id]) or float(cost[id]) < 0.0:
+        if not resources.has(id) or not _finite_number(resources[id]) or not _finite_number(cost[id]) or float(cost[id]) < 0.0:
             return false
-        if float(resources[id]) + EPSILON < float(cost[id]):
+        if float(resources[id]) < float(cost[id]):
             return false
     return true
 
@@ -264,8 +264,11 @@ func _valid_drill_job(job: Dictionary, restored_depth: int, restored_drill_level
     var required_level := mini(Catalog.MAX_DRILL_LEVEL, 1 + floori(float(restored_depth + 10) / 30.0))
     if restored_drill_level < required_level:
         return false
-    var expected_duration := (30.0 + restored_depth * 0.5) / restored_drill_level
-    return is_equal_approx(float(job["duration"]), expected_duration)
+    for committed_level in range(required_level, restored_drill_level + 1):
+        var committed_duration := (30.0 + restored_depth * 0.5) / committed_level
+        if is_equal_approx(float(job["duration"]), committed_duration):
+            return true
+    return false
 
 func _valid_job_times(job: Dictionary) -> bool:
     if not _finite_number(job["remaining"]) or not _finite_number(job["duration"]):

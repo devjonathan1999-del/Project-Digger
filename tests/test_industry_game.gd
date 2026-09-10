@@ -249,6 +249,10 @@ func test_restore_rejects_invalid_data_without_mutation(t: TestSupport) -> void:
     var bad_target: Dictionary = baseline.duplicate(true)
     bad_target["jobs"] = {"drill": {"remaining": 10.0, "duration": 30.0, "target_depth": 40}}
     invalid_states.append(bad_target)
+    var bad_drill_duration: Dictionary = baseline.duplicate(true)
+    bad_drill_duration["drill_level"] = 2
+    bad_drill_duration["jobs"] = {"drill": {"remaining": 10.0, "duration": 17.0, "target_depth": 10}}
+    invalid_states.append(bad_drill_duration)
 
     for invalid in invalid_states:
         t.equal(game.restore(invalid), false, "état invalide refusé")
