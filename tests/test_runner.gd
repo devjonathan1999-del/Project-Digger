@@ -11,6 +11,7 @@ const TEST_SUITES := [
     preload("res://tests/test_terrain_visual_profile.gd"),
     preload("res://tests/test_ui_contract.gd"),
     preload("res://tests/test_scene_contract.gd"),
+    preload("res://tests/test_cave_backdrop.gd"),
     preload("res://tests/test_feedback_classifier.gd"),
     preload("res://tests/test_procedural_audio.gd"),
     preload("res://tests/test_vertical_slice_acceptance.gd"),
