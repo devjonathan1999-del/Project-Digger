@@ -11,7 +11,8 @@ func run(t: TestSupport) -> void:
     var classifier_script = load(CLASSIFIER_PATH)
     var classifier = classifier_script.new()
 
-    t.equal(classifier.call("classify_movements", []), 0, "aucun mouvement = aucun impact")
+    var none: Array[Dictionary] = []
+    t.equal(classifier.call("classify_movements", none), 0, "aucun mouvement = aucun impact")
 
     var light: Array[Dictionary] = [
         {"from": Vector2i(1, 1), "to": Vector2i(1, 2), "material_id": &"rock_common"},
