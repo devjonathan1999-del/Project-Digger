@@ -34,6 +34,8 @@ func test_renderer_coordinate_conversion(t: TestSupport) -> void:
     var has_api := renderer.has_method("cell_from_local")
     t.equal(has_api, true, "conversion locale du renderer disponible")
     if not has_api:
+        renderer.free()
         return
     t.equal(renderer.call("cell_from_local", Vector2(0.0, 0.0)), Vector2i(0, 0), "origine vers cellule 0,0")
     t.equal(renderer.call("cell_from_local", Vector2(31.9, 48.1)), Vector2i(1, 3), "conversion locale respecte CELL_SIZE")
+    renderer.free()
