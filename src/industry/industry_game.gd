@@ -3,6 +3,8 @@ extends RefCounted
 
 const Catalog = preload("res://src/industry/industry_catalog.gd")
 const FACILITIES: Array[String] = ["furnace", "workshop", "drill"]
+const V1_RESOURCE_IDS := ["iron", "coal", "copper", "iron_ingot", "copper_ingot", "cable"]
+const PRIORITY_BRANCHES := ["production", "logistics", "exploration"]
 const EPSILON := 0.000001
 
 var resources: Dictionary = {
@@ -12,11 +14,26 @@ var resources: Dictionary = {
     "iron_ingot": 0.0,
     "copper_ingot": 0.0,
     "cable": 0.0,
+    "crystal": 0.0,
 }
 var mine_levels: Dictionary = {"iron": 1, "coal": 1, "copper": 1}
 var drill_level: int = 1
 var depth: int = 0
 var jobs: Dictionary = {}
+
+var center_level: int = 1
+var permanent_sites: Dictionary = {}
+var discoveries: Dictionary = {}
+var explorations: Dictionary = {}
+var claimed_milestones: Array = []
+var tech_points: int = 0
+var unlocked_technologies: Array = []
+var built_technologies: Array = []
+var priority_branch: String = ""
+var priority_cooldown_remaining: float = 0.0
+var active_event: Dictionary = {}
+var pending_events: Array = []
+var world_seed: int = 1
 
 func advance(seconds: float) -> Dictionary:
     var report := {"produced": {}, "completed": [], "depth_gained": 0}
@@ -64,33 +81,82 @@ func snapshot() -> Dictionary:
         "drill_level": drill_level,
         "depth": depth,
         "jobs": jobs.duplicate(true),
+        "center_level": center_level,
+        "permanent_sites": permanent_sites.duplicate(true),
+        "discoveries": discoveries.duplicate(true),
+        "explorations": explorations.duplicate(true),
+        "claimed_milestones": claimed_milestones.duplicate(true),
+        "tech_points": tech_points,
+        "unlocked_technologies": unlocked_technologies.duplicate(true),
+        "built_technologies": built_technologies.duplicate(true),
+        "priority_branch": priority_branch,
+        "priority_cooldown_remaining": priority_cooldown_remaining,
+        "active_event": active_event.duplicate(true),
+        "pending_events": pending_events.duplicate(true),
+        "world_seed": world_seed,
     }
 
 func restore(data: Dictionary) -> bool:
     if not _valid_snapshot(data):
         return false
 
+    _restore_core(data)
+    center_level = int(data["center_level"])
+    permanent_sites = data["permanent_sites"].duplicate(true)
+    discoveries = data["discoveries"].duplicate(true)
+    explorations = data["explorations"].duplicate(true)
+    claimed_milestones = _integer_array(data["claimed_milestones"])
+    tech_points = int(data["tech_points"])
+    unlocked_technologies = data["unlocked_technologies"].duplicate(true)
+    built_technologies = data["built_technologies"].duplicate(true)
+    priority_branch = str(data["priority_branch"])
+    priority_cooldown_remaining = float(data["priority_cooldown_remaining"])
+    active_event = data["active_event"].duplicate(true)
+    pending_events = data["pending_events"].duplicate(true)
+    world_seed = int(data["world_seed"])
+    return true
+
+func restore_v1(data: Dictionary, seed: int) -> bool:
+    if seed == 0 or not _valid_v1_snapshot(data):
+        return false
+
     var restored_resources: Dictionary = data["resources"].duplicate(true)
     for id in restored_resources:
         restored_resources[id] = float(restored_resources[id])
+    restored_resources["crystal"] = 0.0
+    resources = restored_resources
+
     var restored_levels: Dictionary = data["mine_levels"].duplicate(true)
     for id in restored_levels:
         restored_levels[id] = int(restored_levels[id])
-    var restored_jobs: Dictionary = data["jobs"].duplicate(true)
-    for facility in restored_jobs:
-        restored_jobs[facility]["remaining"] = float(restored_jobs[facility]["remaining"])
-        restored_jobs[facility]["duration"] = float(restored_jobs[facility]["duration"])
-        if facility == "drill":
-            restored_jobs[facility]["target_depth"] = int(restored_jobs[facility]["target_depth"])
-        else:
-            restored_jobs[facility]["quantity"] = int(restored_jobs[facility]["quantity"])
-
-    resources = restored_resources
     mine_levels = restored_levels
     drill_level = int(data["drill_level"])
     depth = int(data["depth"])
-    jobs = restored_jobs
+    jobs = _restored_jobs(data["jobs"])
+
+    center_level = 1
+    permanent_sites = {}
+    discoveries = {}
+    explorations = {}
+    claimed_milestones = []
+    tech_points = 0
+    unlocked_technologies = []
+    built_technologies = []
+    priority_branch = ""
+    priority_cooldown_remaining = 0.0
+    active_event = {}
+    pending_events = []
+    world_seed = seed
     return true
+
+func apply_retroactive_milestones() -> void:
+    for milestone_depth in Catalog.MILESTONES:
+        var milestone := int(milestone_depth)
+        if milestone > depth or milestone in claimed_milestones:
+            continue
+        tech_points += int(Catalog.MILESTONES[milestone].get("tech_points", 0))
+        claimed_milestones.append(milestone)
+    claimed_milestones.sort()
 
 func can_afford(cost: Dictionary) -> bool:
     for id in cost:
@@ -207,10 +273,76 @@ func _spend(cost: Dictionary) -> void:
     for id in cost:
         resources[id] = float(resources[id]) - float(cost[id])
 
+func _restore_core(data: Dictionary) -> void:
+    var restored_resources: Dictionary = data["resources"].duplicate(true)
+    for id in restored_resources:
+        restored_resources[id] = float(restored_resources[id])
+    resources = restored_resources
+
+    var restored_levels: Dictionary = data["mine_levels"].duplicate(true)
+    for id in restored_levels:
+        restored_levels[id] = int(restored_levels[id])
+    mine_levels = restored_levels
+    drill_level = int(data["drill_level"])
+    depth = int(data["depth"])
+    jobs = _restored_jobs(data["jobs"])
+
+func _restored_jobs(source: Dictionary) -> Dictionary:
+    var restored_jobs: Dictionary = source.duplicate(true)
+    for facility in restored_jobs:
+        restored_jobs[facility]["remaining"] = float(restored_jobs[facility]["remaining"])
+        restored_jobs[facility]["duration"] = float(restored_jobs[facility]["duration"])
+        if facility == "drill":
+            restored_jobs[facility]["target_depth"] = int(restored_jobs[facility]["target_depth"])
+        else:
+            restored_jobs[facility]["quantity"] = int(restored_jobs[facility]["quantity"])
+    return restored_jobs
+
 func _valid_snapshot(data: Dictionary) -> bool:
+    var keys := [
+        "resources", "mine_levels", "drill_level", "depth", "jobs",
+        "center_level", "permanent_sites", "discoveries", "explorations",
+        "claimed_milestones", "tech_points", "unlocked_technologies",
+        "built_technologies", "priority_branch", "priority_cooldown_remaining",
+        "active_event", "pending_events", "world_seed",
+    ]
+    if not _has_exact_keys(data, keys):
+        return false
+    if not _valid_core_values(data, Catalog.RESOURCES.keys()):
+        return false
+    if not _valid_integer(data["center_level"], 1, Catalog.CENTER_LEVELS.size()):
+        return false
+    if typeof(data["permanent_sites"]) != TYPE_DICTIONARY or typeof(data["discoveries"]) != TYPE_DICTIONARY or typeof(data["explorations"]) != TYPE_DICTIONARY:
+        return false
+    if not _valid_claimed_milestones(data["claimed_milestones"]):
+        return false
+    if not _valid_integer(data["tech_points"], 0):
+        return false
+    if not _valid_technology_array(data["unlocked_technologies"]) or not _valid_technology_array(data["built_technologies"]):
+        return false
+    for id in data["built_technologies"]:
+        if id not in data["unlocked_technologies"]:
+            return false
+    if typeof(data["priority_branch"]) != TYPE_STRING or (data["priority_branch"] != "" and data["priority_branch"] not in PRIORITY_BRANCHES):
+        return false
+    if not _finite_number(data["priority_cooldown_remaining"]) or float(data["priority_cooldown_remaining"]) < 0.0:
+        return false
+    if typeof(data["active_event"]) != TYPE_DICTIONARY or typeof(data["pending_events"]) != TYPE_ARRAY:
+        return false
+    for event in data["pending_events"]:
+        if typeof(event) != TYPE_DICTIONARY:
+            return false
+    if not _valid_integer(data["world_seed"], -9223372036854775807, 9223372036854775807) or int(data["world_seed"]) == 0:
+        return false
+    return true
+
+func _valid_v1_snapshot(data: Dictionary) -> bool:
     if not _has_exact_keys(data, ["resources", "mine_levels", "drill_level", "depth", "jobs"]):
         return false
-    if typeof(data["resources"]) != TYPE_DICTIONARY or not _has_exact_keys(data["resources"], Catalog.RESOURCES.keys()):
+    return _valid_core_values(data, V1_RESOURCE_IDS)
+
+func _valid_core_values(data: Dictionary, resource_ids: Array) -> bool:
+    if typeof(data["resources"]) != TYPE_DICTIONARY or not _has_exact_keys(data["resources"], resource_ids):
         return false
     for value in data["resources"].values():
         if not _finite_number(value) or float(value) < 0.0:
@@ -240,6 +372,35 @@ func _valid_snapshot(data: Dictionary) -> bool:
         elif not _valid_batch_job(facility, job):
             return false
     return true
+
+func _valid_claimed_milestones(value: Variant) -> bool:
+    if typeof(value) != TYPE_ARRAY:
+        return false
+    var seen := {}
+    for entry in value:
+        if not _valid_integer(entry, 0):
+            return false
+        var milestone := int(entry)
+        if not Catalog.MILESTONES.has(milestone) or seen.has(milestone):
+            return false
+        seen[milestone] = true
+    return true
+
+func _valid_technology_array(value: Variant) -> bool:
+    if typeof(value) != TYPE_ARRAY:
+        return false
+    var seen := {}
+    for id in value:
+        if typeof(id) != TYPE_STRING or not Catalog.TECHNOLOGIES.has(id) or seen.has(id):
+            return false
+        seen[id] = true
+    return true
+
+func _integer_array(value: Array) -> Array:
+    var result: Array = []
+    for entry in value:
+        result.append(int(entry))
+    return result
 
 func _valid_batch_job(facility: String, job: Dictionary) -> bool:
     if not _has_exact_keys(job, ["recipe", "quantity", "remaining", "duration"]):
