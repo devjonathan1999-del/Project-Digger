@@ -1,0 +1,27 @@
+name: Godot 4.7.2 headless tests
+
+on:
+  push:
+    branches:
+      - feature/digger-v0.1
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.2
+        shell: bash
+        run: |
+          curl -L -o godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          chmod +x Godot_v4.7.2-stable_linux.x86_64
+          ./Godot_v4.7.2-stable_linux.x86_64 --version
+
+      - name: Run headless test suite
+        shell: bash
+        run: |
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_runner.gd
