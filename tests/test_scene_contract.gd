@@ -21,5 +21,6 @@ func run(t: TestSupport) -> void:
 
     var camera := scene.get_node_or_null("GameCamera") as Camera2D
     if camera != null:
-        t.check(camera.zoom.x >= 1.2, "cadrage initial rapproché")
+        t.check(camera.zoom.x >= 1.6, "cadrage initial immersif v0.2")
+        t.equal(camera.has_method("configure_bounds"), true, "caméra bornée à la caverne")
     scene.free()
