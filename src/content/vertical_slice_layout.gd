@@ -1,7 +1,7 @@
 class_name VerticalSliceLayout
 extends RefCounted
 
-const CONTENT_ID := "cave_v02_helix_01"
+const CONTENT_ID := "cave_v02_helix_02"
 const WIDTH := 64
 const HEIGHT := 72
 const CELL_SIZE := 16
@@ -16,14 +16,35 @@ const SUPPORT_REMOVAL: Array[Vector2i] = [
 func build() -> Dictionary:
     var model := TerrainModel.new(WIDTH, HEIGHT)
 
-    # Anchored outer geology. The thick logical shell remains simple and
-    # dependable; organic presentation is handled by the renderer/backdrop.
+    # Anchored outer geology. The cave now reads as negative space cut through
+    # a continuous mass rather than as isolated platforms floating in a box.
     _fill_rect(model, Rect2i(0, 0, 6, HEIGHT), &"rock_dense")
     _fill_rect(model, Rect2i(58, 0, 6, HEIGHT), &"rock_dense")
     _fill_rect(model, Rect2i(6, 0, 52, 4), &"rock_dense")
 
-    # Entrance pocket: overlapping, hand-eroded shelves create a natural
-    # descending silhouette instead of four clean rectangular bands.
+    # Broad irregular shoulders grow inward from the side walls. They remain
+    # far from the canonical gate puzzle, so presentation gains density without
+    # changing the intended stability solution.
+    _fill_rect(model, Rect2i(6, 4, 7, 7), &"rock_dense")
+    _fill_rect(model, Rect2i(6, 17, 5, 7), &"rock_dense")
+    _fill_rect(model, Rect2i(6, 37, 7, 12), &"rock_dense")
+    _fill_rect(model, Rect2i(6, 49, 4, 9), &"rock_dense")
+    _fill_rect(model, Rect2i(53, 4, 5, 26), &"rock_dense")
+    _fill_rect(model, Rect2i(51, 37, 7, 13), &"rock_dense")
+    _fill_rect(model, Rect2i(54, 50, 4, 8), &"rock_dense")
+    _carve_cells(model, [
+        Vector2i(12, 4), Vector2i(12, 5), Vector2i(11, 6), Vector2i(12, 10),
+        Vector2i(10, 17), Vector2i(10, 18), Vector2i(9, 23), Vector2i(10, 23),
+        Vector2i(12, 37), Vector2i(12, 38), Vector2i(11, 39), Vector2i(12, 42),
+        Vector2i(12, 46), Vector2i(11, 48), Vector2i(9, 49), Vector2i(9, 50),
+        Vector2i(53, 4), Vector2i(53, 5), Vector2i(54, 8), Vector2i(53, 12),
+        Vector2i(53, 17), Vector2i(54, 23), Vector2i(53, 28), Vector2i(53, 29),
+        Vector2i(51, 37), Vector2i(51, 38), Vector2i(52, 41), Vector2i(51, 47),
+        Vector2i(54, 50), Vector2i(54, 51), Vector2i(55, 56), Vector2i(54, 57),
+    ])
+
+    # Entrance pocket: overlapping, hand-eroded shelves descend from the left
+    # shoulder and teach the material language without reading as a flat band.
     _fill_rect(model, Rect2i(6, 8, 12, 3), &"rock_common")
     _fill_rect(model, Rect2i(8, 11, 10, 2), &"rock_common")
     _fill_rect(model, Rect2i(14, 13, 10, 2), &"rock_fragile")
@@ -48,8 +69,8 @@ func build() -> Dictionary:
         Vector2i(6, 34), Vector2i(7, 34), Vector2i(17, 34), Vector2i(6, 36), Vector2i(16, 36), Vector2i(17, 36),
     ])
 
-    # Central chamber framing. These broad shelves retain enough mass to read
-    # clearly while their edges are cut into asymmetric geological shoulders.
+    # Central chamber framing. Broad shelves emerge from surrounding geology
+    # while asymmetric cuts keep their silhouette readable and non-rectangular.
     _fill_rect(model, Rect2i(18, 38, 8, 4), &"rock_common")
     _fill_rect(model, Rect2i(41, 30, 17, 4), &"rock_common")
     _fill_rect(model, Rect2i(44, 34, 14, 3), &"rock_fragile")
