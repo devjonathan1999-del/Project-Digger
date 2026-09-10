@@ -1,12 +1,13 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://src/vertical_slice.gd" id="1_root"]
 [ext_resource type="Script" path="res://src/view/cave_backdrop.gd" id="2_backdrop"]
 [ext_resource type="Script" path="res://src/view/terrain_renderer.gd" id="3_renderer"]
 [ext_resource type="Script" path="res://src/view/ancient_overlay.gd" id="4_ancient"]
-[ext_resource type="Script" path="res://src/view/game_camera.gd" id="5_camera"]
-[ext_resource type="Script" path="res://src/input/game_input.gd" id="6_input"]
-[ext_resource type="Script" path="res://src/ui/hud.gd" id="7_hud"]
+[ext_resource type="Script" path="res://src/feedback/resolution_fx.gd" id="5_fx"]
+[ext_resource type="Script" path="res://src/view/game_camera.gd" id="6_camera"]
+[ext_resource type="Script" path="res://src/input/game_input.gd" id="7_input"]
+[ext_resource type="Script" path="res://src/ui/hud.gd" id="8_hud"]
 
 [node name="VerticalSlice" type="Node2D"]
 script = ExtResource("1_root")
@@ -20,13 +21,16 @@ script = ExtResource("3_renderer")
 [node name="AncientOverlay" type="Node2D" parent="."]
 script = ExtResource("4_ancient")
 
+[node name="ResolutionFx" type="Node2D" parent="."]
+script = ExtResource("5_fx")
+
 [node name="GameCamera" type="Camera2D" parent="."]
 enabled = true
-script = ExtResource("5_camera")
+script = ExtResource("6_camera")
 
 [node name="GameInput" type="Node" parent="."]
-script = ExtResource("6_input")
+script = ExtResource("7_input")
 
 [node name="HUD" type="CanvasLayer" parent="."]
 layer = 10
-script = ExtResource("7_hud")
+script = ExtResource("8_hud")
