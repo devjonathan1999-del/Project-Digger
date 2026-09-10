@@ -54,15 +54,20 @@ func test_content_compatibility(t: TestSupport) -> void:
     model.set_cell(Vector2i(0, 0), TerrainCell.new(&"rock_common"))
     var save := SaveSystem.new()
 
+    var has_content_api := save.has_method("load_from_path_for_content")
+    t.equal(has_content_api, true, "API de chargement par content_id disponible")
+    if not has_content_api:
+        return
+
     t.equal(save.save_to_path(CONTENT_PATH, model, {
         "cycle_state": SimulationController.OBSERVER,
         "content_id": "cave_v02_helix_01",
     }), true, "sauvegarde avec identifiant de contenu")
 
-    var compatible := save.load_from_path_for_content(CONTENT_PATH, "cave_v02_helix_01")
+    var compatible: Dictionary = save.call("load_from_path_for_content", CONTENT_PATH, "cave_v02_helix_01")
     t.equal(String(compatible.get("content_id", "")), "cave_v02_helix_01", "contenu compatible restauré")
 
-    var different := save.load_from_path_for_content(CONTENT_PATH, "another_cave")
+    var different: Dictionary = save.call("load_from_path_for_content", CONTENT_PATH, "another_cave")
     t.equal(different.is_empty(), true, "autre contenu rejeté")
 
     var old_payload := {
@@ -75,7 +80,8 @@ func test_content_compatibility(t: TestSupport) -> void:
     var old_file := FileAccess.open(OLD_CONTENT_PATH, FileAccess.WRITE)
     old_file.store_string(JSON.stringify(old_payload))
     old_file.close()
-    t.equal(save.load_from_path_for_content(OLD_CONTENT_PATH, "cave_v02_helix_01").is_empty(), true, "save v0.1 sans content_id rejetée")
+    var old_loaded: Dictionary = save.call("load_from_path_for_content", OLD_CONTENT_PATH, "cave_v02_helix_01")
+    t.equal(old_loaded.is_empty(), true, "save v0.1 sans content_id rejetée")
 
 func _cleanup() -> void:
     for path in [SAVE_PATH, CONTENT_PATH, OLD_CONTENT_PATH]:
