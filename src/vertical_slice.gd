@@ -5,8 +5,10 @@ const VisualProfile := preload("res://src/view/terrain_visual_profile.gd")
 @onready var cave_backdrop = $CaveBackdrop
 @onready var terrain_renderer: TerrainRenderer = $TerrainRenderer
 @onready var ancient_overlay = $AncientOverlay
+@onready var resolution_fx = $ResolutionFx
 @onready var game_camera: GameCamera = $GameCamera
 @onready var game_input: GameInput = $GameInput
+@onready var feedback = $FeedbackController
 @onready var hud: DiggerHUD = $HUD
 
 var model: TerrainModel
@@ -19,6 +21,7 @@ var _catalog := MaterialCatalog.new()
 var _objective_reached := false
 var _last_hovered_cell := Vector2i.ZERO
 var _has_hovered_cell := false
+var _trigger_pending := false
 
 func _ready() -> void:
 	_layout_data = VerticalSliceLayout.new().build()
@@ -42,6 +45,7 @@ func _ready() -> void:
 	ancient_overlay.set_connected(controller.relay_connected)
 	game_camera.set_focus_cell(_layout_data["spawn_focus"], TerrainRenderer.CELL_SIZE)
 	game_input.configure(terrain_renderer)
+	feedback.configure(game_camera, resolution_fx, ancient_overlay)
 
 	controller.state_changed.connect(_on_state_changed)
 	controller.energy_changed.connect(hud.set_energy)
@@ -72,20 +76,33 @@ func _ready() -> void:
 		_refresh_prepare_state()
 
 func _on_prepare_requested() -> void:
-	if _objective_reached:
+	if _objective_reached or _trigger_pending:
 		return
 	if controller.enter_prepare():
 		_refresh_prepare_state()
 
 func _on_trigger_requested() -> void:
-	if controller.trigger_resolution():
+	if _trigger_pending or controller.state != SimulationController.PREPARE:
+		return
+	_trigger_pending = true
+	hud.set_busy(true)
+	feedback.play_trigger_anticipation()
+	await get_tree().create_timer(0.12).timeout
+	if controller.state == SimulationController.PREPARE:
+		controller.trigger_resolution()
 		_clear_selection()
+	_trigger_pending = false
+	hud.set_busy(false)
 
 func _on_undo_requested() -> void:
+	if _trigger_pending:
+		return
 	if controller.state == SimulationController.PREPARE and controller.terrain_actions.undo():
 		_refresh_prepare_state()
 
 func _on_cancel_requested() -> void:
+	if _trigger_pending:
+		return
 	if controller.cancel_prepare():
 		_clear_selection()
 		terrain_renderer.queue_redraw()
@@ -93,15 +110,31 @@ func _on_cancel_requested() -> void:
 		ancient_overlay.set_connected(controller.relay_connected)
 
 func _on_dig_requested(cell: Vector2i) -> void:
-	if controller.state == SimulationController.PREPARE and controller.terrain_actions.dig(cell):
+	if _trigger_pending or controller.state != SimulationController.PREPARE:
+		return
+	var terrain_cell: TerrainCell = model.get_cell(cell)
+	var material_id: StringName = terrain_cell.material_id if terrain_cell != null else &""
+	if controller.terrain_actions.dig(cell):
+		feedback.play_action(&"dig", material_id)
 		_refresh_prepare_state()
 
 func _on_move_requested(cells: Array[Vector2i], offset: Vector2i) -> void:
-	if controller.state == SimulationController.PREPARE and controller.terrain_actions.move(cells, offset):
+	if _trigger_pending or controller.state != SimulationController.PREPARE:
+		return
+	var material_id: StringName = &""
+	if not cells.is_empty():
+		var source_cell: TerrainCell = model.get_cell(cells[0])
+		if source_cell != null:
+			material_id = source_cell.material_id
+	if controller.terrain_actions.move(cells, offset):
+		feedback.play_action(&"move", material_id)
 		_refresh_prepare_state()
 
 func _on_fuse_requested(target: Vector2i, source: Vector2i) -> void:
-	if controller.state == SimulationController.PREPARE and controller.terrain_actions.fuse(target, source):
+	if _trigger_pending or controller.state != SimulationController.PREPARE:
+		return
+	if controller.terrain_actions.fuse(target, source):
+		feedback.play_action(&"fuse", &"stabilizer")
 		_refresh_prepare_state()
 
 func _on_tool_changed(tool: StringName) -> void:
@@ -177,6 +210,9 @@ func _on_resolution_finished(movements: Array[Dictionary]) -> void:
 
 	if _is_exit_open():
 		_objective_reached = true
+	var exit_rect: Rect2i = _layout_data["exit_rect"]
+	var success_cell := Vector2i(exit_rect.position.x + int(exit_rect.size.x / 2), exit_rect.position.y)
+	feedback.play_resolution(movements, controller.relay_connected, _objective_reached, success_cell)
 	_refresh_hud()
 	_autosave()
 
