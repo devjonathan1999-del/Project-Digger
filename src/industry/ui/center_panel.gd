@@ -49,10 +49,10 @@ func refresh() -> void:
     var game = session.game
     _level.text = "Centre niveau %d" % game.center_level
     _capacity.text = "Capacité : %d / %d utilisée" % [game.used_capacity(), game.total_capacity()]
-    var reason := game.center_upgrade_block_reason()
+    var reason: String = str(game.center_upgrade_block_reason())
     _upgrade.disabled = reason != ""
     if game.center_level < Catalog.CENTER_LEVELS.size():
-        var next_level := game.center_level + 1
+        var next_level: int = int(game.center_level) + 1
         _upgrade_cost.text = "Niveau %d · %s" % [next_level, _cost(Catalog.CENTER_LEVELS[next_level]["cost"])]
         if reason != "":
             _upgrade_cost.text += "\n" + reason
