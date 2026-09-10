@@ -4,17 +4,20 @@ extends Control
 const Catalog = preload("res://src/industry/industry_catalog.gd")
 const Style = preload("res://src/industry/ui/industry_theme.gd")
 const Overview = preload("res://src/industry/ui/mine_overview.gd")
+const IndustryPanelScript = preload("res://src/industry/ui/industry_panel.gd")
+const CenterPanelScript = preload("res://src/industry/ui/center_panel.gd")
+const TechnologyPanelScript = preload("res://src/industry/ui/technology_panel.gd")
 
 var session
 var _wallet: Dictionary = {}
-var _mines: Dictionary = {}
-var _facilities: Dictionary = {}
-var _columns: BoxContainer
-var _mine_row: BoxContainer
-var _factory_row: BoxContainer
 var _wallet_grid: GridContainer
-var _overview: Control
+var _content_host: VBoxContainer
+var _mine_panel: VBoxContainer
+var _industry_panel
+var _center_panel
+var _technology_panel
 var _depth: Label
+var _overview: Control
 var _drill_info: Label
 var _drill_cost: Label
 var _drill_upgrade: Button
@@ -24,6 +27,8 @@ var _dig_progress: ProgressBar
 var _offline: Label
 var _save_notice: Label
 var _save_status: Label
+var _tabs: Dictionary = {}
+var _current_view := "mine"
 
 func _ready() -> void:
     session = get_node("IndustrySession")
@@ -32,6 +37,7 @@ func _ready() -> void:
     session.changed.connect(_refresh)
     session.notice_changed.connect(_refresh_notices)
     resized.connect(_responsive)
+    _select_view("mine")
     _responsive()
     _refresh()
     _refresh_notices()
@@ -42,153 +48,144 @@ func _build() -> void:
     background.mouse_filter = Control.MOUSE_FILTER_IGNORE
     add_child(background)
     background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+    var outer := MarginContainer.new()
+    outer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    for side in ["left", "right", "top", "bottom"]:
+        outer.add_theme_constant_override("margin_" + side, 16)
+    add_child(outer)
+
+    var shell := VBoxContainer.new()
+    shell.name = "IndustryShell"
+    shell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    shell.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    shell.add_theme_constant_override("separation", 10)
+    outer.add_child(shell)
+
+    var header := HBoxContainer.new()
+    shell.add_child(header)
+    var title := VBoxContainer.new()
+    title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    title.add_theme_constant_override("separation", 1)
+    header.add_child(title)
+    _label(title, "D I G G E R  /  INDUSTRIES", 22)
+    _label(title, "Progression verticale", 13, Style.MUTED)
+    _depth = _label(header, "", 27, Style.COPPER)
+
+    _wallet_grid = GridContainer.new()
+    _wallet_grid.name = "WalletGrid"
+    shell.add_child(_wallet_grid)
+    for id in Catalog.RESOURCES:
+        var box := _card(_wallet_grid, 8)
+        _label(box, Catalog.RESOURCES[id]["label"], 12, Style.MUTED)
+        var number := _label(box, "0", 19, Style.ACCENT if Catalog.RESOURCES[id]["raw"] else Style.COPPER)
+        number.name = "Stock_" + id
+        _wallet[id] = number
+
+    _offline = _label(shell, "", 14, Style.ACCENT)
+    _offline.name = "OfflineNotice"
+    _save_notice = _label(shell, "", 14, Style.COPPER)
+    _save_notice.name = "SaveNotice"
+
     var scroll := ScrollContainer.new()
     scroll.name = "PageScroll"
     scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    add_child(scroll)
-    scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    var margin := MarginContainer.new()
-    margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    for side in ["left", "right", "top", "bottom"]:
-        margin.add_theme_constant_override("margin_" + side, 22)
-    scroll.add_child(margin)
-    var page := VBoxContainer.new()
-    page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    page.add_theme_constant_override("separation", 16)
-    margin.add_child(page)
-    var header := HBoxContainer.new()
-    page.add_child(header)
-    var title := VBoxContainer.new()
-    title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    title.add_theme_constant_override("separation", 2)
-    header.add_child(title)
-    _label(title, "D I G G E R  /  INDUSTRIES", 24)
-    _label(title, "Du minerai aux profondeurs", 15, Style.MUTED)
-    _depth = _label(header, "", 30, Style.ACCENT)
-    _wallet_grid = GridContainer.new()
-    _wallet_grid.columns = 6
-    page.add_child(_wallet_grid)
-    for id in Catalog.RESOURCES:
-        var box := _card(_wallet_grid, 10)
-        _label(box, Catalog.RESOURCES[id]["label"], 14, Style.MUTED)
-        var number := _label(box, "0", 24, Style.ACCENT if Catalog.RESOURCES[id]["raw"] else Style.COPPER)
-        number.name = "Stock_" + id
-        _wallet[id] = number
-    _offline = _label(page, "", 15, Style.ACCENT)
-    _offline.name = "OfflineNotice"
-    _save_notice = _label(page, "", 15, Style.COPPER)
-    _save_notice.name = "SaveNotice"
-    _columns = BoxContainer.new()
-    _columns.name = "ManagementColumns"
-    _columns.add_theme_constant_override("separation", 18)
-    page.add_child(_columns)
-    var left := VBoxContainer.new()
-    left.custom_minimum_size.x = 290
-    left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    left.size_flags_stretch_ratio = 0.85
-    _columns.add_child(left)
-    var survey := _card(left)
-    _label(survey, "01  /  LE SOUS-SOL", 15, Style.MUTED)
+    scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    shell.add_child(scroll)
+    var content_margin := MarginContainer.new()
+    content_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    content_margin.add_theme_constant_override("margin_right", 8)
+    scroll.add_child(content_margin)
+    _content_host = VBoxContainer.new()
+    _content_host.name = "ContentHost"
+    _content_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    content_margin.add_child(_content_host)
+
+    _build_mine_panel()
+    _industry_panel = IndustryPanelScript.new()
+    _content_host.add_child(_industry_panel)
+    _industry_panel.bind_session(session)
+    _center_panel = CenterPanelScript.new()
+    _content_host.add_child(_center_panel)
+    _center_panel.bind_session(session)
+    _technology_panel = TechnologyPanelScript.new()
+    _content_host.add_child(_technology_panel)
+    _technology_panel.bind_session(session)
+
+    _save_status = _label(shell, "", 12, Style.MUTED)
+    _save_status.name = "SaveStatus"
+
+    var nav := HBoxContainer.new()
+    nav.name = "BottomNavigation"
+    nav.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    shell.add_child(nav)
+    _add_tab(nav, "Mine", "TabMine", "mine")
+    _add_tab(nav, "Industrie", "TabIndustrie", "industry")
+    _add_tab(nav, "Centre", "TabCentre", "center")
+    _add_tab(nav, "Technologie", "TabTechnologie", "technology")
+
+func _build_mine_panel() -> void:
+    _mine_panel = VBoxContainer.new()
+    _mine_panel.name = "MinePanel"
+    _mine_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _mine_panel.add_theme_constant_override("separation", 14)
+    _content_host.add_child(_mine_panel)
+    _label(_mine_panel, "MINE", 22)
+    _label(_mine_panel, "Descends par horizons de 10 m et ouvre de nouveaux paliers.", 14, Style.MUTED)
+    var row := BoxContainer.new()
+    row.name = "MineColumns"
+    row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    row.add_theme_constant_override("separation", 16)
+    _mine_panel.add_child(row)
+
+    var survey := _card(row)
+    survey.custom_minimum_size.x = 280
+    _label(survey, "COUPE DU SOUS-SOL", 14, Style.MUTED)
     _overview = Overview.new()
     survey.add_child(_overview)
-    var drill := _card(left)
-    _label(drill, "Foreuse", 21)
-    _drill_info = _label(drill, "", 15, Style.MUTED)
-    _drill_cost = _label(drill, "", 14, Style.COPPER)
+
+    var drill := _card(row)
+    _label(drill, "Foreuse", 20)
+    _drill_info = _label(drill, "", 14, Style.MUTED)
+    _drill_cost = _label(drill, "", 13, Style.COPPER)
     _drill_upgrade = _button(drill, "Améliorer la foreuse", "DrillUpgrade")
     _drill_upgrade.pressed.connect(_upgrade_drill)
-    _dig_info = _label(drill, "", 14, Style.MUTED)
+    _dig_info = _label(drill, "", 13, Style.MUTED)
     _dig_progress = _progress(drill, "ExcavationProgress")
     _dig = _button(drill, "", "ExcavationStart")
     _dig.pressed.connect(_start_excavation)
-    var right := VBoxContainer.new()
-    right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    right.size_flags_stretch_ratio = 2.0
-    right.add_theme_constant_override("separation", 16)
-    _columns.add_child(right)
-    _label(right, "02  /  EXTRACTION CONTINUE", 15, Style.MUTED)
-    _mine_row = BoxContainer.new()
-    right.add_child(_mine_row)
-    for id in Catalog.MINES:
-        var box := _card(_mine_row, 12)
-        _label(box, Catalog.RESOURCES[id]["label"], 20)
-        var info := _label(box, "", 15, Style.ACCENT)
-        var cost := _label(box, "", 14, Style.MUTED)
-        cost.custom_minimum_size.y = 42
-        var upgrade := _button(box, "Améliorer", "MineUpgrade_" + id)
-        upgrade.pressed.connect(_upgrade_mine.bind(id))
-        _mines[id] = {"info": info, "cost": cost, "button": upgrade}
-    _label(right, "03  /  TRANSFORMATION", 15, Style.MUTED)
-    _factory_row = BoxContainer.new()
-    right.add_child(_factory_row)
-    _build_factory("furnace", "Fonderie", ["iron_ingot", "copper_ingot"], "Furnace")
-    _build_factory("workshop", "Atelier", ["cable"], "Workshop")
-    var help := _card(right, 12)
-    _label(help, "CAP SUR LE PROCHAIN HORIZON", 14, Style.ACCENT)
-    _label(help, "Les mines produisent en continu. Lance des lots pour préparer ta prochaine amélioration.", 15, Style.MUTED)
-    _label(help, "Chaque palier de 30 m augmente le débit des mines de 15 %. Une foreuse renforcée ouvre les horizons suivants.", 14, Style.MUTED)
-    _save_status = _label(page, "", 13, Style.MUTED)
-    _save_status.name = "SaveStatus"
 
-func _build_factory(facility: String, title: String, recipes: Array, prefix: String) -> void:
-    var box := _card(_factory_row)
-    _label(box, title, 21)
-    var select := OptionButton.new()
-    select.name = prefix + "Recipe"
-    select.custom_minimum_size.y = 40
-    select.fit_to_longest_item = false
-    for recipe in recipes:
-        select.add_item(Catalog.RECIPES[recipe]["label"])
-    box.add_child(select)
-    select.item_selected.connect(_selection_changed)
-    var row := HBoxContainer.new()
-    box.add_child(row)
-    var caption := _label(row, "Quantité", 15, Style.MUTED)
-    caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    var quantity := SpinBox.new()
-    quantity.name = prefix + "Quantity"
-    quantity.min_value = 1
-    quantity.max_value = 10
-    quantity.value = 1
-    quantity.custom_minimum_size = Vector2(92, 40)
-    row.add_child(quantity)
-    quantity.value_changed.connect(_quantity_changed)
-    var cost := _label(box, "", 14, Style.COPPER)
-    cost.custom_minimum_size.y = 38
-    var state := _label(box, "", 14, Style.MUTED)
-    state.custom_minimum_size.y = 36
-    var progress := _progress(box, prefix + "Progress")
-    var button := _button(box, "Lancer le lot", prefix + "Start")
-    button.pressed.connect(_start_batch.bind(facility))
-    _facilities[facility] = {"select": select, "quantity": quantity, "recipes": recipes, "cost": cost, "state": state, "progress": progress, "button": button}
+func _add_tab(parent: Node, title: String, node_name: String, view_id: String) -> void:
+    var button := _button(parent, title, node_name)
+    button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    button.pressed.connect(_select_view.bind(view_id))
+    _tabs[view_id] = button
+
+func _select_view(view_id: String) -> void:
+    if view_id not in ["mine", "industry", "center", "technology"]:
+        return
+    _current_view = view_id
+    _mine_panel.visible = view_id == "mine"
+    _industry_panel.visible = view_id == "industry"
+    _center_panel.visible = view_id == "center"
+    _technology_panel.visible = view_id == "technology"
+    for id in _tabs:
+        _tabs[id].disabled = id == view_id
+    if view_id == "industry":
+        _industry_panel.refresh()
+    elif view_id == "center":
+        _center_panel.refresh()
+    elif view_id == "technology":
+        _technology_panel.refresh()
 
 func _refresh() -> void:
+    if session == null:
+        return
     var game = session.game
     _depth.text = "−%d m" % game.depth
     for id in _wallet:
         _wallet[id].text = str(floori(game.resources[id]))
-    for id in _mines:
-        var widgets: Dictionary = _mines[id]
-        var maximum: bool = game.mine_levels[id] >= Catalog.MAX_MINE_LEVEL
-        var affordable: bool = game.can_afford(game.mine_upgrade_cost(id))
-        widgets["info"].text = "Niv. %d  ·  %.1f / min" % [game.mine_levels[id], game.mine_rate(id) * 60.0]
-        widgets["cost"].text = "Niveau maximum" if maximum else "%s\n%s" % [_cost(game.mine_upgrade_cost(id)), "Amélioration disponible" if affordable else "Ressources insuffisantes"]
-        widgets["button"].disabled = maximum or not affordable
-    for facility in _facilities:
-        var widgets: Dictionary = _facilities[facility]
-        var recipe: String = widgets["recipes"][widgets["select"].selected]
-        var quantity := int(widgets["quantity"].value)
-        var definition: Dictionary = Catalog.RECIPES[recipe]
-        var reason: String = game.batch_block_reason(recipe, quantity)
-        widgets["cost"].text = "%s\n%d × %s · %s" % [_cost(definition["inputs"], quantity), quantity, definition["label"], _duration(definition["seconds"] * quantity)]
-        widgets["button"].disabled = reason != ""
-        widgets["progress"].value = 0
-        if game.jobs.has(facility):
-            var job: Dictionary = game.jobs[facility]
-            widgets["state"].text = "%d × %s\nEn cours · reste %s" % [job["quantity"], Catalog.RECIPES[job["recipe"]]["label"], _duration(job["remaining"])]
-            widgets["progress"].value = _percent(job)
-        else:
-            widgets["state"].text = "Prêt à produire" if reason == "" else reason
     var maximum: bool = game.drill_level >= Catalog.MAX_DRILL_LEVEL
     var affordable: bool = game.can_afford(game.drill_upgrade_cost())
     _drill_info.text = "Niveau %d / %d · Objectif : −%d m" % [game.drill_level, Catalog.MAX_DRILL_LEVEL, game.depth + 10]
@@ -204,6 +201,9 @@ func _refresh() -> void:
     else:
         _dig_info.text = "Chantier disponible · +10 m" if reason == "" else reason
     _overview.set_progress(game.depth, game.drill_level, game.jobs.get("drill", {}))
+    _industry_panel.refresh()
+    _center_panel.refresh()
+    _technology_panel.refresh()
 
 func _refresh_notices() -> void:
     _save_notice.visible = session.save_blocked or session.save_error != ""
@@ -223,13 +223,21 @@ func _refresh_notices() -> void:
         _offline.text = "Bon retour · %s d'absence\nRécolté : %s · %d travaux terminés · +%d m" % [_duration(session.offline_seconds), _cost(report.get("produced", {})), completed.size(), report.get("depth_gained", 0)]
 
 func _responsive() -> void:
-    if _columns == null:
+    if _wallet_grid == null:
         return
     var narrow := size.x < 1000
-    _columns.vertical = narrow
-    _wallet_grid.columns = 3 if narrow else 6
-    _mine_row.vertical = size.x < 620
-    _factory_row.vertical = size.x < 620
+    _wallet_grid.columns = 3 if narrow else 7
+    var mine_columns = find_child("MineColumns", true, false) as BoxContainer
+    if mine_columns != null:
+        mine_columns.vertical = size.x < 720
+    if _industry_panel != null:
+        _industry_panel._responsive()
+
+func _upgrade_drill() -> void:
+    session.upgrade_drill()
+
+func _start_excavation() -> void:
+    session.start_excavation()
 
 func _cost(cost: Dictionary, multiplier: int = 1) -> String:
     var parts := PackedStringArray()
@@ -282,22 +290,3 @@ func _progress(parent: Node, node_name: String) -> ProgressBar:
     bar.show_percentage = false
     parent.add_child(bar)
     return bar
-
-func _selection_changed(_index: int) -> void:
-    _refresh()
-
-func _quantity_changed(_value: float) -> void:
-    _refresh()
-
-func _start_batch(facility: String) -> void:
-    var widgets: Dictionary = _facilities[facility]
-    session.start_batch(widgets["recipes"][widgets["select"].selected], int(widgets["quantity"].value))
-
-func _upgrade_mine(id: String) -> void:
-    session.upgrade_mine(id)
-
-func _upgrade_drill() -> void:
-    session.upgrade_drill()
-
-func _start_excavation() -> void:
-    session.start_excavation()
