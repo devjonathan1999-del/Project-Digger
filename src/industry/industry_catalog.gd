@@ -59,10 +59,34 @@ const MILESTONES: Dictionary = {
 }
 
 const POCKET_TYPES: Dictionary = {
-    "rich_vein": {"kind": "exhaustible", "hint": "Forte signature minérale", "capacity": 0},
-    "unstable_cavity": {"kind": "exhaustible", "hint": "Cavité instable", "capacity": 0},
-    "crystal_cavern": {"kind": "permanent", "hint": "Anomalie minérale", "capacity": 2},
-    "ancient_structure": {"kind": "permanent", "hint": "Structure inconnue", "capacity": 2},
+    "rich_vein": {
+        "kind": "exhaustible",
+        "hint": "Forte signature minérale",
+        "capacity": 0,
+        "cost": {"iron": 10},
+        "seconds": 60.0,
+    },
+    "unstable_cavity": {
+        "kind": "exhaustible",
+        "hint": "Cavité instable",
+        "capacity": 0,
+        "cost": {"iron": 12, "coal": 4},
+        "seconds": 90.0,
+    },
+    "crystal_cavern": {
+        "kind": "permanent",
+        "hint": "Anomalie minérale",
+        "capacity": 2,
+        "cost": {"iron_ingot": 3, "cable": 1},
+        "seconds": 180.0,
+    },
+    "ancient_structure": {
+        "kind": "permanent",
+        "hint": "Structure inconnue",
+        "capacity": 2,
+        "cost": {"iron_ingot": 5, "copper_ingot": 3, "cable": 2},
+        "seconds": 300.0,
+    },
 }
 
 const TECHNOLOGIES: Dictionary = {
