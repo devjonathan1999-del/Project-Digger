@@ -98,12 +98,12 @@ func test_clock_rollback_keeps_saved_instant(t: TestSupport) -> void:
 func test_invalid_files_are_preserved(t: TestSupport) -> void:
     var invalid_payloads: Array[String] = [
         "octets illisibles",
-        JSON.stringify({"version": 2, "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot()}),
-        JSON.stringify({"version": "1", "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot()}),
-        JSON.stringify({"version": 1.5, "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot()}),
-        JSON.stringify({"version": 1, "saved_at_unix": -1.0, "industry": IndustryGameScript.new().snapshot()}),
-        JSON.stringify({"version": 1, "saved_at_unix": 1000.0, "industry": {}}),
-        JSON.stringify({"version": 1, "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot(), "extra": true}),
+        JSON.stringify({"version": 3, "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot()}),
+        JSON.stringify({"version": "2", "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot()}),
+        JSON.stringify({"version": 2.5, "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot()}),
+        JSON.stringify({"version": 2, "saved_at_unix": -1.0, "industry": IndustryGameScript.new().snapshot()}),
+        JSON.stringify({"version": 2, "saved_at_unix": 1000.0, "industry": {}}),
+        JSON.stringify({"version": 2, "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot(), "extra": true}),
     ]
     var save = IndustrySaveScript.new()
     for bytes in invalid_payloads:
