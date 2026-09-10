@@ -1,7 +1,7 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="PackedScene" path="res://scenes/vertical_slice.tscn" id="1_slice"]
+[ext_resource type="PackedScene" path="res://scenes/industry.tscn" id="1_industry"]
 
 [node name="Main" type="Node"]
 
-[node name="VerticalSlice" parent="." instance=ExtResource("1_slice")]
+[node name="Industry" parent="." instance=ExtResource("1_industry")]

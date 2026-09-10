@@ -1,6 +1,6 @@
 # Project Digger
 
-Vertical slice v0.1 d'un jeu 2D en coupe verticale centré sur la manipulation du sous-sol.
+Prototype industriel jouable : extraire en continu, transformer les minerais et renforcer une foreuse pour atteindre de nouveaux horizons. Interface native en français, avec coupe du sous-sol et progression persistante.
 
 ## Moteur
 
@@ -19,10 +19,40 @@ godot --path .
 ## Lancer les tests
 
 ```bash
+godot --headless --editor --quit --path .
 godot --headless --path . -s res://tests/test_runner.gd
+godot --headless --path . -s res://tests/test_industry_ui.gd
 ```
 
 Le runner renvoie `0` si toutes les assertions passent et `1` sinon.
+
+## Boucle industrielle
+
+Les mines de **fer**, **charbon** et **cuivre** produisent automatiquement. Leur niveau augmente le débit ; chaque palier de 30 mètres apporte un bonus de 15 % au débit de base. La fonderie et l'atelier travaillent indépendamment, avec un lot actif par installation et des quantités de 1 à 10.
+
+| Installation | Produit | Coût par unité | Durée par unité |
+| --- | --- | --- | --- |
+| Fonderie | Lingot de fer | 4 fer + 1 charbon | 20 s |
+| Fonderie | Lingot de cuivre | 3 cuivre + 1 charbon | 25 s |
+| Atelier | Câble | 2 lingots de cuivre + 1 lingot de fer | 40 s |
+
+Premier parcours :
+
+1. Dans la **Fonderie**, choisir le fer, régler la quantité à **3**, puis lancer le lot (60 s).
+2. Choisir le cuivre, quantité **2**, puis lancer le lot (50 s).
+3. Dans l'**Atelier**, fabriquer **1 câble** (40 s).
+4. **Améliorer la foreuse**, puis **Ouvrir le chantier** pour atteindre −10 m.
+5. Quitter et rouvrir : les stocks ont progressé et les travaux lancés ont continué pendant l'absence.
+
+Cette préparation initiale de 2 min 30 est un réglage provisoire pour tester la boucle, pas un rythme de rétention de production garanti. Les mines et la foreuse peuvent être améliorées jusqu'aux niveaux 10 et 5. La progression n'est jamais réinitialisée et l'absence n'entraîne aucune pénalité.
+
+La sauvegarde industrielle dédiée est `user://industry_v1.json`. Elle conserve stocks, niveaux, profondeur et travaux en cours, avec sauvegarde automatique toutes les dix secondes et après les actions. Un bilan non bloquant apparaît après au moins cinq secondes d'absence. Une sauvegarde invalide est préservée et une erreur est affichée. L'ancienne sauvegarde de terrain reste séparée dans `user://save_v1.json`.
+
+L'écran s'empile sous 1 000 pixels de largeur et défile verticalement. Les captures graphiques CI (1280 × 800 et 720 × 1000) sont produites avec un vrai rendu OpenGL sous Xvfb, puis publiées dans l'artefact `industry-ui`. Les tests headless seuls ne prouvent pas la qualité visuelle. Aucun test Windows ou Android n'est revendiqué.
+
+## Prototype terrain conservé
+
+La scène `scenes/vertical_slice.tscn` reste disponible directement dans l'éditeur (ouvrir la scène puis F6). Les contrôles et règles ci-dessous concernent cette ancienne scène.
 
 ## Contrôles
 

@@ -12,6 +12,7 @@ const TEST_SUITES := [
     preload("res://tests/test_industry_game.gd"),
     preload("res://tests/test_industry_save.gd"),
     preload("res://tests/test_industry_session.gd"),
+    preload("res://tests/test_industry_acceptance.gd"),
 ]
 
 var _exit_code := 1
