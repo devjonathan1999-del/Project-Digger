@@ -158,7 +158,7 @@ func _draw_crystal_signatures() -> void:
 func _rebuild_targets() -> void:
     for target in _targets:
         if is_instance_valid(target):
-            target.queue_free()
+            target.free()
     _targets.clear()
     if session == null:
         return
