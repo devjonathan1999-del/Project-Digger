@@ -3,7 +3,7 @@ name: Godot 4.7.2 headless tests
 on:
   push:
     branches:
-      - feature/digger-v0.1
+      - feature/digger-v0.2
       - main
   workflow_dispatch:
 
