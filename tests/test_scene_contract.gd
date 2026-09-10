@@ -9,4 +9,5 @@ func run(t: TestSupport) -> void:
     t.check(scene.get_node_or_null("CaveBackdrop") != null, "fond de caverne présent")
     t.check(scene.get_node_or_null("TerrainRenderer") != null, "renderer terrain présent")
     t.check(scene.get_node_or_null("AncientOverlay") != null, "overlay ancien présent")
+    t.check(scene.get_node_or_null("ResolutionFx") != null, "FX de résolution présents")
     scene.free()
