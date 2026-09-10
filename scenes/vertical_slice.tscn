@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://src/vertical_slice.gd" id="1_root"]
 [ext_resource type="Script" path="res://src/view/cave_backdrop.gd" id="2_backdrop"]
@@ -7,7 +7,8 @@
 [ext_resource type="Script" path="res://src/feedback/resolution_fx.gd" id="5_fx"]
 [ext_resource type="Script" path="res://src/view/game_camera.gd" id="6_camera"]
 [ext_resource type="Script" path="res://src/input/game_input.gd" id="7_input"]
-[ext_resource type="Script" path="res://src/ui/hud.gd" id="8_hud"]
+[ext_resource type="Script" path="res://src/feedback/feedback_controller.gd" id="8_feedback"]
+[ext_resource type="Script" path="res://src/ui/hud.gd" id="9_hud"]
 
 [node name="VerticalSlice" type="Node2D"]
 script = ExtResource("1_root")
@@ -32,6 +33,9 @@ script = ExtResource("6_camera")
 [node name="GameInput" type="Node" parent="."]
 script = ExtResource("7_input")
 
+[node name="FeedbackController" type="Node" parent="."]
+script = ExtResource("8_feedback")
+
 [node name="HUD" type="CanvasLayer" parent="."]
 layer = 10
-script = ExtResource("8_hud")
+script = ExtResource("9_hud")
