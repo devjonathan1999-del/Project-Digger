@@ -1,5 +1,6 @@
 extends SceneTree
 
+# Import contract for the local final-graphics asset pack.
 const Support = preload("res://tests/test_support.gd")
 const Renderer = preload("res://src/industry/ui/mine_module_renderer.gd")
 const Assets = preload("res://src/industry/ui/mine_v06_assets.gd")
