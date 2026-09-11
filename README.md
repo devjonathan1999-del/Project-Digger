@@ -32,7 +32,7 @@ Parcours UI réel avec rendu OpenGL sous Xvfb :
 xvfb-run -a godot --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_industry_ui.gd -- --screenshots /tmp/digger-ui
 ```
 
-La CI ajoute également des parcours dédiés aux actions contextuelles, au **Filon instable**, aux états visuels modulaires et à la présentation v0.4. Le runner renvoie `0` si toutes les assertions passent et `1` sinon.
+La CI ajoute également des parcours dédiés aux actions contextuelles, au **Filon instable**, aux états visuels modulaires et aux présentations v0.4/v0.5. Le runner renvoie `0` si toutes les assertions passent et `1` sinon.
 
 ## Boucle industrielle
 
@@ -114,6 +114,22 @@ La direction visuelle cible environ **75 % rétro-futuriste industriel / 25 % sc
 
 Les captures CI v0.4 couvrent les états **1280×800** et **720×1000**, avec panneau contextuel fermé puis ouvert.
 
+## Profondeur visuelle v0.5
+
+La v0.5 approfondit la scène Mine sans modifier la boucle économique, les coûts, les récompenses ni le schéma de sauvegarde.
+
+- Les galeries utilisent des profils **déterministes semi-procéduraux** selon la profondeur et le côté du puits : largeur, hauteur, supports, lampes, machines, alcôves, voies interrompues, zones élargies, effondrements et culs-de-sac varient sans changer au rechargement.
+- Le puits central gagne des plateformes aux horizons principaux, un ascenseur, un contrepoids, des câbles, conduites et liaisons techniques afin de devenir l’axe visuel permanent de la mine.
+- La surface devient une base minière identifiable : chevalement, atelier, silo, centre d’opérations, ventilation puis équipements supplémentaires selon le niveau du Centre.
+- La roche n’est plus composée uniquement de bandes plates : strates segmentées, fissures, blocs, éboulis, petites cavités et inclusions minérales sont générés de façon déterministe.
+- La profondeur modifie progressivement l’ambiance : tons neutres/ambre en haut, roche plus sombre vers 60–90 m, puis cyan et turquoise de plus en plus présents à partir de 90 m sans transformer l’ensemble en décor néon.
+- Les marqueurs Fer/Charbon/Cuivre, Foreuse, découvertes et sites restent discrets au repos. Ils sont renforcés au survol, au focus ou lors d’une sélection, puis reviennent à leur état discret lorsque le contexte est fermé.
+- Les boutons tactiles réels restent presque invisibles afin de préserver les interactions existantes sans faire revenir l’aspect « gros boutons de debug ».
+
+`MineVisualLayout` fournit les profils de présentation déterministes ; `MineSceneRenderer` les consomme sans écrire dans l’état économique. La v0.5 conserve donc `user://industry_v1.json` et le **schéma interne v2** sans migration supplémentaire.
+
+Les captures CI v0.5 couvrent quatre états déterministes : **1280×800 à 60 m**, **1280×800 à 150 m**, **720×1000 à 90 m** et **1280×800 avec une découverte profonde sélectionnée**.
+
 ## Sauvegarde et progression hors ligne
 
 La sauvegarde industrielle reste :
@@ -152,9 +168,12 @@ La CI Godot 4.7.2 vérifie notamment :
 - états visuels modulaires v0.3 ;
 - contrat de layout v0.4 ;
 - renderer industriel v0.4 et montée progressive des accents profonds ;
+- profils déterministes et silhouettes de galeries v0.5 ;
+- enrichissement du puits, de la surface et de la géologie avec la profondeur ;
+- marqueurs contextuels v0.5 au repos, focus et sélection, y compris retour au repos à la fermeture du contexte ;
 - zones tactiles invisibles mais réellement cliquables ;
 - absence de mutation économique par le rendu ;
-- captures wide/narrow avec contexte fermé/ouvert publiées dans l’artefact `industry-ui`.
+- captures wide/narrow v0.4 et quatre scénarios v0.5 publiés dans l’artefact `industry-ui`.
 
 Les captures CI utilisent un vrai rendu OpenGL sous Xvfb. Aucun test Windows ou Android n’est revendiqué à ce stade.
 
@@ -191,6 +210,11 @@ Quand le corridor final est ouvert, le HUD affiche :
 `Accès aux profondeurs ouvert — Vertical slice terminé`
 
 ## Documentation
+
+### Profondeur visuelle v0.5
+
+- Design : `docs/superpowers/specs/2026-09-11-visual-depth-v0.5-design.md`
+- Plan : `docs/superpowers/plans/2026-09-11-visual-depth-v0.5.md`
 
 ### Présentation visuelle v0.4
 

@@ -2,13 +2,28 @@ class_name MineSceneRenderer
 extends Control
 
 const Style = preload("res://src/industry/ui/industry_theme.gd")
+const Layout = preload("res://src/industry/ui/mine_visual_layout.gd")
 
 const PIXELS_PER_METER := 7.0
 const SURFACE_Y := 72.0
+const GALLERY_HORIZONS := [12, 30, 60, 90, 120, 150]
+const SHAFT_PLATFORM_HORIZONS := [30, 60, 90, 120, 150]
 
 var surface_module_count := 0
 var gallery_detail_count := 0
 var deep_accent_strength := 0.0
+var gallery_variants_seen: Dictionary = {}
+var gallery_silhouette_count := 0
+var broken_rail_count := 0
+var alcove_count := 0
+var shaft_platform_count := 0
+var shaft_utility_count := 0
+var surface_feature_count := 0
+var ventilation_visible := false
+var geology_detail_count := 0
+var visible_cavity_count := 0
+var visible_fracture_count := 0
+var deep_cyan_strength := 0.0
 
 var _session
 var _world: Control
@@ -32,6 +47,10 @@ func set_scene_state(state: Dictionary) -> void:
     surface_module_count = 4 + maxi(0, mini(center_level - 3, 3))
     gallery_detail_count = 5 if depth >= 30 else 3
     deep_accent_strength = accent_strength_for_depth(depth)
+    _update_gallery_metrics(depth, center_level)
+    _update_shaft_metrics(depth)
+    _update_surface_metrics(center_level)
+    _update_geology_metrics(depth)
     queue_redraw()
 
 func accent_strength_for_depth(depth: int) -> float:
@@ -67,6 +86,50 @@ func _sync_state() -> void:
         "viewport_size": size,
     })
 
+func _update_gallery_metrics(depth: int, center_level: int) -> void:
+    gallery_variants_seen.clear()
+    gallery_silhouette_count = 0
+    broken_rail_count = 0
+    alcove_count = 0
+    for horizon in GALLERY_HORIZONS:
+        if horizon > depth + 15:
+            continue
+        for side in [0, 1]:
+            var profile: Dictionary = Layout.gallery_profile(horizon, side, depth, center_level)
+            var variant := str(profile["variant"])
+            gallery_variants_seen[variant] = true
+            gallery_silhouette_count += 1
+            if float(profile["rail_break_start"]) >= 0.0:
+                broken_rail_count += 1
+            if int(profile["alcove_side"]) >= 0:
+                alcove_count += 1
+
+func _update_shaft_metrics(depth: int) -> void:
+    shaft_platform_count = 0
+    for horizon in SHAFT_PLATFORM_HORIZONS:
+        if horizon <= depth:
+            shaft_platform_count += 1
+    shaft_utility_count = 4 if depth > 0 else 0
+
+func _update_surface_metrics(center_level: int) -> void:
+    var profile: Dictionary = Layout.surface_profile(center_level)
+    var modules: Array = profile["modules"]
+    surface_feature_count = modules.size()
+    ventilation_visible = modules.has("ventilation")
+
+func _update_geology_metrics(depth: int) -> void:
+    var profile: Dictionary = Layout.geology_profile(depth)
+    visible_fracture_count = int(profile["fracture_count"])
+    visible_cavity_count = int(profile["cavity_count"])
+    deep_cyan_strength = float(profile["cyan_strength"])
+    geology_detail_count = (
+        int(profile["strata_count"])
+        + visible_fracture_count
+        + int(profile["rock_block_count"])
+        + visible_cavity_count
+        + int(profile["mineral_inclusion_count"])
+    )
+
 func _draw() -> void:
     if _state.is_empty():
         return
@@ -81,12 +144,12 @@ func _draw() -> void:
 
 func _draw_geology() -> void:
     var zones := [
-        [0.0, 30.0, Color("323338")],
-        [30.0, 60.0, Color("293039")],
-        [60.0, 90.0, Color("202a34")],
-        [90.0, 120.0, Color("192833")],
-        [120.0, 150.0, Color("13232d")],
-        [150.0, 230.0, Color("0d1d28")],
+        [0.0, 30.0, Color("36363a")],
+        [30.0, 60.0, Color("2d3238")],
+        [60.0, 90.0, Color("242d36")],
+        [90.0, 120.0, Color("1c2a34")],
+        [120.0, 150.0, Color("162731")],
+        [150.0, 230.0, Color("0f202a")],
     ]
     for zone in zones:
         var y1 := _depth_to_y(float(zone[0]))
@@ -101,31 +164,108 @@ func _draw_geology() -> void:
     var last_depth := ceili(_scroll_depth() + size.y / maxf(PIXELS_PER_METER * _zoom(), 0.01)) + 10
     for depth_value in range(first_depth, last_depth + 1, 10):
         var y := _depth_to_y(float(depth_value))
-        if y < 0.0 or y > size.y:
+        if y < -60.0 or y > size.y + 60.0:
             continue
-        var alpha := 0.055 + accent_strength_for_depth(depth_value) * 0.06
-        var wave := sin(float(depth_value) * 0.27) * 5.0
-        draw_line(Vector2(0, y), Vector2(size.x, y + wave), Color(0.70, 0.78, 0.80, alpha), 1.0)
+        var profile: Dictionary = Layout.geology_profile(depth_value)
+        _draw_strata_band(depth_value, y, profile)
+        _draw_fractures(depth_value, y, profile)
+        _draw_rock_blocks(depth_value, y, profile)
+        _draw_small_cavities(depth_value, y, profile)
+        _draw_mineral_inclusions(depth_value, y, profile)
+
+    var shaft_shadow := Color(0.0, 0.0, 0.0, 0.10)
+    draw_rect(Rect2(size.x * 0.5 - 52.0, 0.0, 104.0, size.y), shaft_shadow)
+
+func _draw_strata_band(depth_value: int, y: float, profile: Dictionary) -> void:
+    var count := int(profile["strata_count"])
+    var cyan := float(profile["cyan_strength"])
+    for index in range(count):
+        var start_x := float(_detail_value(depth_value, index, 11, maxi(1, int(size.x))))
+        var span := 70.0 + float(_detail_value(depth_value, index, 17, 125))
+        var end_x := minf(size.x, start_x + span)
+        if end_x - start_x < 24.0:
+            start_x = maxf(0.0, start_x - 80.0)
+            end_x = minf(size.x, start_x + span)
+        var y_offset := float(_detail_value(depth_value, index, 23, 13) - 6)
+        var slope := float(_detail_value(depth_value, index, 29, 9) - 4)
+        var alpha := 0.07 + cyan * 0.08
+        draw_line(Vector2(start_x, y + y_offset), Vector2(end_x, y + y_offset + slope), Color(0.68, 0.75, 0.77, alpha), 1.0)
+
+func _draw_fractures(depth_value: int, y: float, profile: Dictionary) -> void:
+    var count := int(profile["fracture_count"])
+    var cyan := float(profile["cyan_strength"])
+    var color := Color(0.16 + cyan * 0.10, 0.20 + cyan * 0.32, 0.22 + cyan * 0.34, 0.42)
+    for index in range(count):
+        var x := 18.0 + float(_detail_value(depth_value, index, 31, maxi(1, int(maxf(1.0, size.x - 36.0)))))
+        var start := Vector2(x, y - 24.0 + float(_detail_value(depth_value, index, 37, 35)))
+        var p1 := start + Vector2(float(_detail_value(depth_value, index, 41, 17) - 8), 9.0)
+        var p2 := p1 + Vector2(float(_detail_value(depth_value, index, 43, 19) - 9), 10.0)
+        var p3 := p2 + Vector2(float(_detail_value(depth_value, index, 47, 15) - 7), 8.0)
+        draw_polyline(PackedVector2Array([start, p1, p2, p3]), color, 1.2)
+
+func _draw_rock_blocks(depth_value: int, y: float, profile: Dictionary) -> void:
+    var count := int(profile["rock_block_count"])
+    for index in range(count):
+        var x := 24.0 + float(_detail_value(depth_value, index, 53, maxi(1, int(maxf(1.0, size.x - 48.0)))))
+        var yy := y + float(_detail_value(depth_value, index, 59, 45) - 22)
+        var radius := 3.0 + float(_detail_value(depth_value, index, 61, 7))
+        var tone := 0.23 + float(_detail_value(depth_value, index, 67, 8)) * 0.012
+        draw_circle(Vector2(x, yy), radius, Color(tone, tone * 0.98, tone * 0.94, 0.52))
+
+func _draw_small_cavities(depth_value: int, y: float, profile: Dictionary) -> void:
+    var count := int(profile["cavity_count"])
+    for index in range(count):
+        var x := 50.0 + float(_detail_value(depth_value, index, 71, maxi(1, int(maxf(1.0, size.x - 100.0)))))
+        var yy := y + float(_detail_value(depth_value, index, 73, 35) - 17)
+        var rx := 13.0 + float(_detail_value(depth_value, index, 79, 13))
+        var ry := 6.0 + float(_detail_value(depth_value, index, 83, 7))
+        var points := PackedVector2Array()
+        for point_index in range(12):
+            var angle := TAU * float(point_index) / 12.0
+            points.append(Vector2(x + cos(angle) * rx, yy + sin(angle) * ry))
+        draw_colored_polygon(points, Color(0.035, 0.055, 0.065, 0.74))
+        draw_polyline(points + PackedVector2Array([points[0]]), Color(0.25, 0.33, 0.35, 0.20), 1.0)
+
+func _draw_mineral_inclusions(depth_value: int, y: float, profile: Dictionary) -> void:
+    var count := int(profile["mineral_inclusion_count"])
+    var cyan := float(profile["cyan_strength"])
+    var mineral := Color(0.78, 0.49, 0.27, 0.62) if depth_value < 90 else Color(0.25, 0.84, 0.80, 0.35 + cyan * 0.45)
+    for index in range(count):
+        var x := 28.0 + float(_detail_value(depth_value, index, 89, maxi(1, int(maxf(1.0, size.x - 56.0)))))
+        var yy := y + float(_detail_value(depth_value, index, 97, 41) - 20)
+        var length := 5.0 + float(_detail_value(depth_value, index, 101, 9))
+        draw_line(Vector2(x - length * 0.5, yy + 3.0), Vector2(x, yy - length), mineral, 1.6)
+        draw_line(Vector2(x, yy - length), Vector2(x + length * 0.5, yy + 2.0), mineral, 1.1)
+
+func _detail_value(depth_value: int, index: int, salt: int, modulus: int) -> int:
+    var safe_modulus := maxi(1, modulus)
+    return absi(depth_value * 97 + index * 53 + salt * 31 + (depth_value % 17) * 11) % safe_modulus
 
 func _draw_surface() -> void:
     var y := _depth_to_y(0.0)
     if y < -90.0 or y > size.y + 90.0:
         return
-    draw_rect(Rect2(0, y - 74.0, size.x, 74.0), Color("14212a"))
+    draw_rect(Rect2(0, y - 78.0, size.x, 78.0), Color("14212a"))
     draw_line(Vector2(0, y), Vector2(size.x, y), Color("8e6a48"), 3.0)
 
+    var profile: Dictionary = Layout.surface_profile(int(_state.get("center_level", 1)))
+    var modules: Array = profile["modules"]
     var center := size.x * 0.50
-    _draw_headframe(center, y)
-    _draw_workshop(size.x * 0.16, y)
-    _draw_silo(size.x * 0.30, y)
-    _draw_operations(size.x * 0.70, y)
-
-    var level := int(_state.get("center_level", 1))
-    if level >= 4:
-        _draw_crane(size.x * 0.83, y)
-    if level >= 5:
-        _draw_antenna(size.x * 0.91, y)
-    if level >= 6:
+    if modules.has("headframe"):
+        _draw_headframe(center, y)
+    if modules.has("workshop"):
+        _draw_workshop(size.x * 0.15, y)
+    if modules.has("silo"):
+        _draw_silo(size.x * 0.29, y)
+    if modules.has("operations"):
+        _draw_operations(size.x * 0.68, y)
+    if modules.has("ventilation"):
+        _draw_ventilation(size.x * 0.80, y, center)
+    if modules.has("crane"):
+        _draw_crane(size.x * 0.86, y)
+    if modules.has("antenna"):
+        _draw_antenna(size.x * 0.94, y)
+    if modules.has("pipe_network"):
         _draw_surface_pipe_network(y)
 
 func _draw_headframe(x: float, ground_y: float) -> void:
@@ -139,26 +279,48 @@ func _draw_headframe(x: float, ground_y: float) -> void:
     draw_line(Vector2(x, ground_y - 41), Vector2(x, ground_y + 12), copper, 2.0)
 
 func _draw_workshop(x: float, ground_y: float) -> void:
-    var rect := Rect2(x - 55, ground_y - 40, 110, 40)
+    var rect := Rect2(x - 58, ground_y - 42, 116, 42)
     draw_rect(rect, Color("394149"))
-    draw_rect(Rect2(rect.position + Vector2(7, 8), Vector2(42, 9)), Color("d3934f"))
-    draw_line(Vector2(x - 58, ground_y - 40), Vector2(x, ground_y - 55), Color("646f76"), 4.0)
-    draw_line(Vector2(x, ground_y - 55), Vector2(x + 58, ground_y - 40), Color("646f76"), 4.0)
-    for px in [-38.0, 0.0, 38.0]:
-        draw_circle(Vector2(x + px, ground_y - 6), 2.5, Color("d69a55"))
+    draw_line(Vector2(x - 62, ground_y - 42), Vector2(x, ground_y - 58), Color("646f76"), 4.0)
+    draw_line(Vector2(x, ground_y - 58), Vector2(x + 62, ground_y - 42), Color("646f76"), 4.0)
+    draw_rect(Rect2(x - 47, ground_y - 30, 42, 30), Color("252f35"))
+    draw_rect(Rect2(x - 41, ground_y - 24, 30, 6), Color("d3934f"))
+    draw_rect(Rect2(x + 25, ground_y - 55, 10, 18), Color("59656b"))
+    for px in [-50.0, 8.0, 48.0]:
+        draw_circle(Vector2(x + px, ground_y - 7), 2.5, Color("d69a55"))
 
 func _draw_silo(x: float, ground_y: float) -> void:
-    draw_rect(Rect2(x - 22, ground_y - 50, 44, 50), Color("59656b"))
+    draw_rect(Rect2(x - 22, ground_y - 50, 44, 42), Color("59656b"))
     draw_circle(Vector2(x, ground_y - 50), 22.0, Color("59656b"))
-    draw_line(Vector2(x - 13, ground_y), Vector2(x - 13, ground_y + 8), Color("868f93"), 3.0)
-    draw_line(Vector2(x + 13, ground_y), Vector2(x + 13, ground_y + 8), Color("868f93"), 3.0)
+    draw_colored_polygon(PackedVector2Array([
+        Vector2(x - 22, ground_y - 8),
+        Vector2(x + 22, ground_y - 8),
+        Vector2(x + 12, ground_y + 3),
+        Vector2(x - 12, ground_y + 3),
+    ]), Color("4d585e"))
+    draw_line(Vector2(x - 13, ground_y + 3), Vector2(x - 13, ground_y + 12), Color("868f93"), 3.0)
+    draw_line(Vector2(x + 13, ground_y + 3), Vector2(x + 13, ground_y + 12), Color("868f93"), 3.0)
     draw_rect(Rect2(x - 17, ground_y - 34, 34, 4), Color("c77b40"))
 
 func _draw_operations(x: float, ground_y: float) -> void:
-    draw_rect(Rect2(x - 65, ground_y - 45, 130, 45), Color("303b43"))
-    draw_rect(Rect2(x - 54, ground_y - 34, 48, 13), Color("53a8a5"))
-    draw_rect(Rect2(x + 8, ground_y - 34, 44, 13), Color("d09452"))
-    draw_line(Vector2(x - 70, ground_y - 46), Vector2(x + 70, ground_y - 46), Color("78838a"), 3.0)
+    draw_rect(Rect2(x - 68, ground_y - 47, 136, 47), Color("303b43"))
+    draw_line(Vector2(x - 72, ground_y - 48), Vector2(x + 72, ground_y - 48), Color("78838a"), 3.0)
+    for offset in [-47.0, -16.0, 15.0]:
+        draw_rect(Rect2(x + offset, ground_y - 35, 24, 13), Color("4b9190"))
+    draw_rect(Rect2(x + 45, ground_y - 31, 12, 22), Color("222d34"))
+    draw_circle(Vector2(x + 51, ground_y - 20), 2.0, Color("d09452"))
+
+func _draw_ventilation(x: float, ground_y: float, shaft_x: float) -> void:
+    var housing := Rect2(x - 30, ground_y - 38, 60, 38)
+    draw_rect(housing, Color("3d484e"))
+    var fan_center := Vector2(x, ground_y - 19)
+    draw_circle(fan_center, 14.0, Color("1c272d"))
+    draw_arc(fan_center, 14.0, 0.0, TAU, 24, Color("75848a"), 3.0)
+    for angle in [0.0, PI * 0.5, PI, PI * 1.5]:
+        draw_line(fan_center, fan_center + Vector2(cos(angle), sin(angle)) * 11.0, Color("75848a"), 3.0)
+    var duct_y := ground_y - 11.0
+    draw_line(Vector2(x - 30, duct_y), Vector2(shaft_x + 24, duct_y), Color("65747a"), 7.0)
+    draw_line(Vector2(shaft_x + 24, duct_y), Vector2(shaft_x + 24, ground_y + 12), Color("65747a"), 7.0)
 
 func _draw_crane(x: float, ground_y: float) -> void:
     var steel := Color("6e787d")
@@ -183,18 +345,46 @@ func _draw_shaft() -> void:
     var bottom_y := _depth_to_y(bottom_depth)
     var top := minf(top_y, bottom_y)
     var height := absf(bottom_y - top_y)
-    draw_rect(Rect2(x - 22, top, 44, height), Color("091117"))
-    draw_line(Vector2(x - 15, top_y), Vector2(x - 15, bottom_y), Color("69757b"), 3.0)
-    draw_line(Vector2(x + 15, top_y), Vector2(x + 15, bottom_y), Color("69757b"), 3.0)
-    draw_line(Vector2(x - 3, top_y), Vector2(x - 3, bottom_y), Color("b17140"), 1.5)
+    var steel := Color("69757b")
+    var amber := Color("cf8e4c")
+    draw_rect(Rect2(x - 27, top, 54, height), Color("091117"))
+
+    draw_line(Vector2(x - 18, top_y), Vector2(x - 18, bottom_y), steel, 3.0)
+    draw_line(Vector2(x + 18, top_y), Vector2(x + 18, bottom_y), steel, 3.0)
+    draw_line(Vector2(x - 7, top_y), Vector2(x - 7, bottom_y), Color("9a704b"), 1.5)
+    draw_line(Vector2(x + 7, top_y), Vector2(x + 7, bottom_y), Color("9a704b"), 1.5)
+    draw_line(Vector2(x - 24, top_y), Vector2(x - 24, bottom_y), Color("6d8288"), 2.0)
+    draw_line(Vector2(x + 24, top_y), Vector2(x + 24, bottom_y), Color("6d8288"), 2.0)
+
+    var travel_top := minf(top_y, bottom_y) + 22.0
+    var travel_bottom := maxf(top_y, bottom_y) - 28.0
+    var travel_span := maxf(0.0, travel_bottom - travel_top)
+    var elevator_t := fposmod(_phase() * 0.08, 1.0)
+    var elevator_y := travel_top + travel_span * elevator_t
+    draw_rect(Rect2(x - 13, elevator_y - 11, 26, 22), Color("48555b"))
+    draw_rect(Rect2(x - 8, elevator_y - 6, 16, 5), amber)
+
+    var counter_y := travel_bottom - travel_span * elevator_t
+    draw_rect(Rect2(x + 11, counter_y - 8, 9, 16), Color("7d6653"))
+
+    var previous_platform_y := top_y
     for depth_value in range(10, int(bottom_depth) + 1, 10):
         var y := _depth_to_y(float(depth_value))
-        draw_line(Vector2(x - 18, y), Vector2(x + 18, y), Color("39464d"), 1.0)
+        draw_line(Vector2(x - 20, y), Vector2(x + 20, y), Color("39464d"), 1.0)
+        if depth_value % 30 != 0:
+            continue
+        draw_rect(Rect2(x - 31, y - 3, 62, 6), Color("56646a"))
+        draw_line(Vector2(x - 31, y), Vector2(x - 54, y), Color("65747a"), 4.0)
+        draw_line(Vector2(x + 31, y), Vector2(x + 54, y), Color("65747a"), 4.0)
+        draw_line(Vector2(x - 20, previous_platform_y), Vector2(x + 20, y), Color("344147"), 1.0)
+        draw_line(Vector2(x + 20, previous_platform_y), Vector2(x - 20, y), Color("344147"), 1.0)
+        draw_circle(Vector2(x - 27, y - 8), 2.5, amber)
+        draw_circle(Vector2(x + 27, y - 8), 2.5, amber)
+        previous_platform_y = y
 
 func _draw_galleries() -> void:
     var current_depth := int(_state.get("depth", 0))
-    var horizons := [12, 30, 60, 90, 120, 150]
-    for depth_value in horizons:
+    for depth_value in GALLERY_HORIZONS:
         if depth_value > current_depth + 15:
             continue
         var y := _depth_to_y(float(depth_value))
@@ -208,29 +398,113 @@ func _draw_gallery(depth_value: float, y: float) -> void:
     var left_end := size.x * 0.45
     var right_start := size.x * 0.55
     var right_end := size.x * 0.92
-    var cavity := Color("11191f")
-    draw_rect(Rect2(left_start, y - 24, left_end - left_start, 48), cavity)
-    draw_rect(Rect2(right_start, y - 24, right_end - right_start, 48), cavity)
-    _draw_gallery_side(left_start, left_end, y, false, accent)
-    _draw_gallery_side(right_start, right_end, y, true, accent)
+    var total_depth := int(_state.get("depth", 0))
+    var center_level := int(_state.get("center_level", 1))
+    var left_profile: Dictionary = Layout.gallery_profile(int(depth_value), 0, total_depth, center_level)
+    var right_profile: Dictionary = Layout.gallery_profile(int(depth_value), 1, total_depth, center_level)
+    _draw_gallery_side_profile(left_start, left_end, y, false, accent, left_profile)
+    _draw_gallery_side_profile(right_start, right_end, y, true, accent, right_profile)
 
-func _draw_gallery_side(start_x: float, end_x: float, y: float, mirrored: bool, accent: float) -> void:
+func _draw_gallery_side_profile(start_x: float, end_x: float, y: float, mirrored: bool, accent: float, profile: Dictionary) -> void:
+    var base_length := end_x - start_x
+    var width_scale := clampf(float(profile["width_scale"]), 0.45, 1.0)
+    var effective_start := start_x
+    var effective_end := end_x
+    if mirrored:
+        effective_end = start_x + base_length * width_scale
+    else:
+        effective_start = end_x - base_length * width_scale
+
+    var gallery_height := clampf(float(profile["height"]), 34.0, 76.0)
+    var cavity_top := y - gallery_height * 0.5
+    var cavity := Color("11191f")
+    draw_rect(Rect2(effective_start, cavity_top, effective_end - effective_start, gallery_height), cavity)
+
+    var variant := str(profile["variant"])
+    if variant == "alcove":
+        _draw_alcove(effective_start, effective_end, y, mirrored, gallery_height)
+    elif variant == "collapsed":
+        _draw_collapse(effective_start, effective_end, y, mirrored)
+    elif variant == "dead_end":
+        _draw_dead_end(effective_start, effective_end, y, mirrored, gallery_height)
+    elif variant == "wide":
+        _draw_storage(effective_start, effective_end, y, mirrored)
+
     var steel := Color("68767c")
     var amber := Color("d49a54")
     var cyan := Color(0.25, 0.86, 0.82, accent)
-    draw_line(Vector2(start_x, y + 14), Vector2(end_x, y + 14), steel, 3.0)
-    draw_line(Vector2(start_x, y + 19), Vector2(end_x, y + 19), Color("37434a"), 2.0)
-    for x in range(int(start_x) + 18, int(end_x), 58):
-        draw_line(Vector2(x, y - 20), Vector2(x, y + 22), steel, 2.0)
-        draw_line(Vector2(x - 8, y - 20), Vector2(x + 8, y - 20), steel, 2.0)
-        draw_circle(Vector2(x, y - 13), 3.0, amber)
-    var pipe_y := y - 8.0
-    draw_line(Vector2(start_x + 10, pipe_y), Vector2(end_x - 10, pipe_y), Color("9a613a"), 3.0)
+    var support_spacing := maxi(40, int(profile["support_spacing"]))
+    var lamp_stride := maxi(1, int(profile["lamp_stride"]))
+    var support_index := 0
+    for support_x in range(int(effective_start) + 18, int(effective_end), support_spacing):
+        var roof_y := cavity_top + 4.0
+        draw_line(Vector2(support_x, roof_y), Vector2(support_x, y + gallery_height * 0.42), steel, 2.0)
+        draw_line(Vector2(support_x - 8, roof_y), Vector2(support_x + 8, roof_y), steel, 2.0)
+        if support_index % lamp_stride == 0:
+            draw_circle(Vector2(support_x, roof_y + 7.0), 3.0, amber)
+        support_index += 1
+
+    _draw_profile_rails(effective_start, effective_end, y, profile)
+
+    var pipe_count := maxi(0, int(profile["pipe_count"]))
+    for pipe_index in range(pipe_count):
+        var pipe_y := y - 8.0 - pipe_index * 6.0
+        draw_line(Vector2(effective_start + 10, pipe_y), Vector2(effective_end - 10, pipe_y), Color("9a613a"), 3.0)
     if accent > 0.15:
-        draw_line(Vector2(start_x + 18, y + 6), Vector2(end_x - 18, y + 6), cyan, 1.5)
-    var machine_x := end_x - 46.0 if not mirrored else start_x + 16.0
-    draw_rect(Rect2(machine_x, y - 4, 32, 18), Color("3d4a51"))
-    draw_rect(Rect2(machine_x + 5, y + 1, 9, 5), amber)
+        draw_line(Vector2(effective_start + 18, y + 6), Vector2(effective_end - 18, y + 6), cyan, 1.5)
+
+    var machine_count := maxi(0, int(profile["machine_count"]))
+    for machine_index in range(machine_count):
+        var offset := float(machine_index) * 38.0
+        var machine_x := effective_end - 46.0 - offset if not mirrored else effective_start + 16.0 + offset
+        if machine_x < effective_start + 4.0 or machine_x + 32.0 > effective_end - 4.0:
+            continue
+        draw_rect(Rect2(machine_x, y - 4, 32, 18), Color("3d4a51"))
+        draw_rect(Rect2(machine_x + 5, y + 1, 9, 5), amber)
+
+func _draw_profile_rails(start_x: float, end_x: float, y: float, profile: Dictionary) -> void:
+    var steel := Color("68767c")
+    var dark := Color("37434a")
+    var break_start := float(profile["rail_break_start"])
+    var break_end := float(profile["rail_break_end"])
+    if break_start < 0.0 or break_end <= break_start:
+        draw_line(Vector2(start_x, y + 14), Vector2(end_x, y + 14), steel, 3.0)
+        draw_line(Vector2(start_x, y + 19), Vector2(end_x, y + 19), dark, 2.0)
+        return
+
+    var gap_start := lerpf(start_x, end_x, clampf(break_start, 0.0, 1.0))
+    var gap_end := lerpf(start_x, end_x, clampf(break_end, 0.0, 1.0))
+    for rail_y in [y + 14.0, y + 19.0]:
+        var color := steel if rail_y < y + 18.0 else dark
+        var line_width := 3.0 if rail_y < y + 18.0 else 2.0
+        draw_line(Vector2(start_x, rail_y), Vector2(gap_start, rail_y), color, line_width)
+        draw_line(Vector2(gap_end, rail_y), Vector2(end_x, rail_y), color, line_width)
+
+func _draw_collapse(start_x: float, end_x: float, y: float, mirrored: bool) -> void:
+    var center_x := lerpf(start_x, end_x, 0.58 if not mirrored else 0.42)
+    var rock := Color("4a4745")
+    draw_circle(Vector2(center_x - 11, y + 8), 11.0, rock)
+    draw_circle(Vector2(center_x + 2, y + 6), 14.0, Color("55504c"))
+    draw_circle(Vector2(center_x + 15, y + 11), 9.0, Color("423f3d"))
+
+func _draw_alcove(start_x: float, end_x: float, y: float, mirrored: bool, gallery_height: float) -> void:
+    var width := minf(64.0, (end_x - start_x) * 0.30)
+    var alcove_x := end_x - width if not mirrored else start_x
+    draw_rect(Rect2(alcove_x, y - gallery_height * 0.72, width, gallery_height * 0.28), Color("0b141a"))
+    draw_line(Vector2(alcove_x + 6, y - gallery_height * 0.45), Vector2(alcove_x + width - 6, y - gallery_height * 0.45), Color("596970"), 2.0)
+
+func _draw_dead_end(start_x: float, end_x: float, y: float, mirrored: bool, gallery_height: float) -> void:
+    var face_x := end_x - 5.0 if mirrored else start_x + 5.0
+    var rock := Color("4b4946")
+    draw_line(Vector2(face_x, y - gallery_height * 0.42), Vector2(face_x, y + gallery_height * 0.42), rock, 8.0)
+    draw_circle(Vector2(face_x + (-6.0 if mirrored else 6.0), y + 10), 9.0, Color("55514d"))
+
+func _draw_storage(start_x: float, end_x: float, y: float, mirrored: bool) -> void:
+    var x := end_x - 86.0 if not mirrored else start_x + 48.0
+    if x < start_x + 4.0 or x + 34.0 > end_x - 4.0:
+        return
+    draw_rect(Rect2(x, y - 25, 34, 16), Color("48545a"))
+    draw_rect(Rect2(x + 5, y - 20, 24, 3), Color("b97842"))
 
 func _draw_sites_and_discoveries() -> void:
     var discoveries: Dictionary = _state.get("discoveries", {})

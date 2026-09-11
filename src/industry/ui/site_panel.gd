@@ -72,6 +72,14 @@ func clear_selection() -> void:
     if _event_choices != null:
         _event_choices.visible = false
     visible = false
+    _clear_world_marker_selection()
+
+func _clear_world_marker_selection() -> void:
+    if not is_inside_tree():
+        return
+    var presenter = get_tree().root.find_child("MineInteractionPresenter", true, false)
+    if presenter != null and presenter.has_method("set_selected_key"):
+        presenter.call("set_selected_key", "")
 
 func refresh() -> void:
     if _session == null or _kind == "" or not _built:

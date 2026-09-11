@@ -6,6 +6,7 @@ on:
       - feature/digger-v0.1
       - feature/progression-v0.3
       - feature/visual-v0.4
+      - feature/visual-depth-v0.5
       - main
   pull_request:
     branches:
@@ -131,6 +132,32 @@ jobs:
             exit 1
           fi
 
+      - name: Exercise visual v0.5 world silhouettes
+        shell: bash
+        run: |
+          set +e
+          timeout 90s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_visual_v05_world.gd 2>&1 | tee godot-v05-world.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-v05-world.log; then
+            exit 1
+          fi
+
+      - name: Exercise visual v0.5 markers
+        shell: bash
+        run: |
+          set +e
+          timeout 90s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_visual_v05_markers.gd 2>&1 | tee godot-v05-markers.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-v05-markers.log; then
+            exit 1
+          fi
+
       - name: Capture visual v0.4 showcase
         shell: bash
         run: |
@@ -141,6 +168,19 @@ jobs:
             exit "$status"
           fi
           if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-v04-captures.log; then
+            exit 1
+          fi
+
+      - name: Capture visual v0.5 showcase
+        shell: bash
+        run: |
+          set +e
+          timeout 90s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_visual_v05_captures.gd -- --screenshots /tmp/digger-ui 2>&1 | tee godot-v05-captures.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-v05-captures.log; then
             exit 1
           fi
 
