@@ -39,6 +39,41 @@ func _run() -> void:
         t.check(broken is int and broken >= 1, "au moins une rupture de rails")
         t.check(alcoves is int and alcoves >= 1, "au moins un renfoncement")
 
+        var shaft_platforms = renderer.get("shaft_platform_count")
+        var shaft_utilities = renderer.get("shaft_utility_count")
+        var surface_features = renderer.get("surface_feature_count")
+        var ventilation = renderer.get("ventilation_visible")
+        t.check(shaft_platforms is int and shaft_platforms >= 5, "plateformes de puits aux horizons")
+        t.check(shaft_utilities is int and shaft_utilities >= 3, "câbles/conduites/contrepoids visibles")
+        t.check(surface_features is int and surface_features >= 7, "base de surface fonctionnellement riche")
+        t.equal(ventilation, true, "ventilation identifiable")
+
+        var deep_surface_count := int(surface_features) if surface_features is int else 0
+        renderer.set_scene_state({
+            "depth": 150,
+            "center_level": 1,
+            "mine_levels": {},
+            "discoveries": {},
+            "permanent_sites": {},
+            "jobs": {},
+            "scroll_depth": 0.0,
+            "zoom": 1.0,
+            "animation_phase": 0.0,
+        })
+        var shallow_surface = renderer.get("surface_feature_count")
+        t.check(shallow_surface is int and shallow_surface < deep_surface_count, "surface plus riche avec le niveau du Centre")
+        renderer.set_scene_state({
+            "depth": 150,
+            "center_level": 6,
+            "mine_levels": {},
+            "discoveries": {},
+            "permanent_sites": {},
+            "jobs": {},
+            "scroll_depth": 0.0,
+            "zoom": 1.0,
+            "animation_phase": 0.0,
+        })
+
     var world = screen.find_child("MineWorld", true, false)
     t.check(world != null, "monde mine disponible")
     if world != null:
