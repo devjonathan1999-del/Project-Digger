@@ -19,6 +19,7 @@ const TEST_SUITES := [
     preload("res://tests/test_progression_operations.gd"),
     preload("res://tests/test_progression_technology.gd"),
     preload("res://tests/test_progression_events.gd"),
+    preload("res://tests/test_progression_acceptance.gd"),
 ]
 
 var _exit_code := 1
