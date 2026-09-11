@@ -186,8 +186,9 @@ Les noms `Fer`, `Charbon`, `Cuivre`, `Foreuse`, `Signal minéral` ne doivent plu
 Comportement retenu :
 
 - état normal : petite balise/pictogramme + texte très discret ;
-- hover/focus : libellé lisible à pleine opacité ;
-- sélection : libellé accentué tant que le panneau contextuel concerne cet élément ;
+- hover/focus sur desktop : libellé lisible à pleine opacité ;
+- sélection/tap : libellé accentué tant que le panneau contextuel concerne cet élément ;
+- sur écran tactile, la sélection remplace le hover comme mécanisme principal de mise en avant ;
 - sites permanents : cyan discret ;
 - foreuse : ambre/cuivre ;
 - minerais principaux : ton neutre industriel.
