@@ -49,11 +49,12 @@ func _run() -> void:
         worker_count += 1
     t.check(worker_count >= 3 and worker_count <= 6, "densité d'équipes limitée à 3–6 silhouettes")
 
-    var has_visual_process: bool = mine_world.has_method("_process")
-    t.check(has_visual_process, "boucle d'animation visuelle présente")
-    if has_visual_process:
+    var has_animation_phase := _has_property(mine_world, "animation_phase")
+    t.check(has_animation_phase, "phase d'animation visuelle exposée")
+    if has_animation_phase:
         var phase_before := float(mine_world.get("animation_phase"))
-        mine_world._process(0.5)
+        if mine_world.has_method("_process"):
+            mine_world._process(0.5)
         var phase_after := float(mine_world.get("animation_phase"))
         t.check(phase_after > phase_before, "phase d'animation purement visuelle progresse")
 
@@ -79,13 +80,22 @@ func _run() -> void:
     mine_world.focus_depth(150)
     mine_world.queue_redraw()
     await process_frame
-    t.check(bool(mine_world.get("deep_zone_visible")), "zone profonde 150 m expose un état graphique dédié")
+    var has_deep_zone := _has_property(mine_world, "deep_zone_visible")
+    t.check(has_deep_zone, "état graphique de profondeur exposé")
+    if has_deep_zone:
+        t.check(bool(mine_world.get("deep_zone_visible")), "zone profonde 150 m expose un état graphique dédié")
 
     screen.queue_free()
     await process_frame
     _cleanup()
     print("Progression UI visuals: %s" % ("PASS" if t.failures == 0 else "FAIL"))
     quit(t.finish())
+
+func _has_property(object: Object, property_name: String) -> bool:
+    for definition in object.get_property_list():
+        if str(definition.get("name", "")) == property_name:
+            return true
+    return false
 
 func _cleanup() -> void:
     for path in [PATH, PATH + ".tmp"]:
