@@ -66,7 +66,7 @@ func _run() -> void:
 
     var crystal_activity = screen.find_child("CrystalActivity_90_crystal", true, false)
     t.check(crystal_activity != null, "cavité cristalline représentée")
-    var inactive_alpha := crystal_activity.modulate.a if crystal_activity != null else 0.0
+    var inactive_alpha: float = crystal_activity.modulate.a if crystal_activity != null else 0.0
     t.check(session.set_site_active("90:crystal", true), "cavité activée pour le rendu")
     await process_frame
     crystal_activity = screen.find_child("CrystalActivity_90_crystal", true, false)
