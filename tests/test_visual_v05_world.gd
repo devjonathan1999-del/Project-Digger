@@ -49,30 +49,22 @@ func _run() -> void:
         t.equal(ventilation, true, "ventilation identifiable")
 
         var deep_surface_count := int(surface_features) if surface_features is int else 0
-        renderer.set_scene_state({
-            "depth": 150,
-            "center_level": 1,
-            "mine_levels": {},
-            "discoveries": {},
-            "permanent_sites": {},
-            "jobs": {},
-            "scroll_depth": 0.0,
-            "zoom": 1.0,
-            "animation_phase": 0.0,
-        })
+        renderer.set_scene_state(_state_for(150, 1))
         var shallow_surface = renderer.get("surface_feature_count")
         t.check(shallow_surface is int and shallow_surface < deep_surface_count, "surface plus riche avec le niveau du Centre")
-        renderer.set_scene_state({
-            "depth": 150,
-            "center_level": 6,
-            "mine_levels": {},
-            "discoveries": {},
-            "permanent_sites": {},
-            "jobs": {},
-            "scroll_depth": 0.0,
-            "zoom": 1.0,
-            "animation_phase": 0.0,
-        })
+
+        renderer.set_scene_state(_state_for(30, 2))
+        var shallow_cyan = renderer.get("deep_cyan_strength")
+        var shallow_details = renderer.get("geology_detail_count")
+        renderer.set_scene_state(_state_for(150, 6))
+        var deep_cyan = renderer.get("deep_cyan_strength")
+        var deep_details = renderer.get("geology_detail_count")
+        var fractures = renderer.get("visible_fracture_count")
+        var cavities = renderer.get("visible_cavity_count")
+        t.check(shallow_cyan is float and deep_cyan is float and deep_cyan > shallow_cyan, "cyan renforcé en profondeur")
+        t.check(shallow_details is int and deep_details is int and deep_details > shallow_details, "géologie plus riche en profondeur")
+        t.check(fractures is int and fractures >= 4, "fissures visibles")
+        t.check(cavities is int and cavities >= 2, "petites cavités visibles")
 
     var world = screen.find_child("MineWorld", true, false)
     t.check(world != null, "monde mine disponible")
@@ -85,6 +77,19 @@ func _run() -> void:
     _cleanup()
     print("Visual v0.5 world: %s" % ("PASS" if t.failures == 0 else "FAIL"))
     quit(t.finish())
+
+func _state_for(depth: int, center_level: int) -> Dictionary:
+    return {
+        "depth": depth,
+        "center_level": center_level,
+        "mine_levels": {},
+        "discoveries": {},
+        "permanent_sites": {},
+        "jobs": {},
+        "scroll_depth": maxf(0.0, float(depth) - 45.0),
+        "zoom": 1.0,
+        "animation_phase": 0.0,
+    }
 
 func _cleanup() -> void:
     if FileAccess.file_exists(PATH):
