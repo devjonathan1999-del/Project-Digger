@@ -40,8 +40,8 @@ func _run() -> void:
     t.check(_presenter != null, "présentateur disponible pour les captures v0.5")
 
     await _prepare_state(60, 3)
-    _world.set("zoom", 0.82)
-    _world.focus_depth(52)
+    _world.set("zoom", 0.75)
+    _world.focus_depth(30)
     _context.call("clear_selection")
     await _settle()
     await _capture(Vector2i(1280, 800), folder.path_join("v05-wide-60m.png"))
