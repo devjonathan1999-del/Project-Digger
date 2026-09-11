@@ -43,7 +43,12 @@ func initialize(now_unix: float) -> void:
 func advance_to(now_unix: float) -> void:
     if not _initialized or not is_finite(now_unix) or now_unix < 0.0 or now_unix <= last_seen_unix:
         return
+    var paused_event: Dictionary = {}
+    if _event_waiting_for_choice():
+        paused_event = game.active_event.duplicate(true)
     game.advance(now_unix - last_seen_unix)
+    if not paused_event.is_empty():
+        game.active_event = paused_event
     last_seen_unix = now_unix
     changed.emit()
 
@@ -95,6 +100,9 @@ func present_pending_event() -> bool:
 
 func choose_event_resource(id: String) -> bool:
     return _apply_action(Callable(game, "choose_event_resource").bind(id))
+
+func _event_waiting_for_choice() -> bool:
+    return not game.active_event.is_empty() and str(game.active_event.get("resource", "")) == ""
 
 func _apply_action(callable: Callable) -> bool:
     advance_to(Time.get_unix_time_from_system())
