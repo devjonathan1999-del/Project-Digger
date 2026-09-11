@@ -49,7 +49,7 @@ func _run() -> void:
         worker_count += 1
     t.check(worker_count >= 3 and worker_count <= 6, "densité d'équipes limitée à 3–6 silhouettes")
 
-    var has_visual_process := mine_world.has_method("_process")
+    var has_visual_process: bool = mine_world.has_method("_process")
     t.check(has_visual_process, "boucle d'animation visuelle présente")
     if has_visual_process:
         var phase_before := float(mine_world.get("animation_phase"))
