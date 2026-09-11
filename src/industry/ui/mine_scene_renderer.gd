@@ -20,6 +20,10 @@ var shaft_platform_count := 0
 var shaft_utility_count := 0
 var surface_feature_count := 0
 var ventilation_visible := false
+var geology_detail_count := 0
+var visible_cavity_count := 0
+var visible_fracture_count := 0
+var deep_cyan_strength := 0.0
 
 var _session
 var _world: Control
@@ -46,6 +50,7 @@ func set_scene_state(state: Dictionary) -> void:
     _update_gallery_metrics(depth, center_level)
     _update_shaft_metrics(depth)
     _update_surface_metrics(center_level)
+    _update_geology_metrics(depth)
     queue_redraw()
 
 func accent_strength_for_depth(depth: int) -> float:
@@ -112,6 +117,19 @@ func _update_surface_metrics(center_level: int) -> void:
     surface_feature_count = modules.size()
     ventilation_visible = modules.has("ventilation")
 
+func _update_geology_metrics(depth: int) -> void:
+    var profile: Dictionary = Layout.geology_profile(depth)
+    visible_fracture_count = int(profile["fracture_count"])
+    visible_cavity_count = int(profile["cavity_count"])
+    deep_cyan_strength = float(profile["cyan_strength"])
+    geology_detail_count = (
+        int(profile["strata_count"])
+        + visible_fracture_count
+        + int(profile["rock_block_count"])
+        + visible_cavity_count
+        + int(profile["mineral_inclusion_count"])
+    )
+
 func _draw() -> void:
     if _state.is_empty():
         return
@@ -126,12 +144,12 @@ func _draw() -> void:
 
 func _draw_geology() -> void:
     var zones := [
-        [0.0, 30.0, Color("323338")],
-        [30.0, 60.0, Color("293039")],
-        [60.0, 90.0, Color("202a34")],
-        [90.0, 120.0, Color("192833")],
-        [120.0, 150.0, Color("13232d")],
-        [150.0, 230.0, Color("0d1d28")],
+        [0.0, 30.0, Color("36363a")],
+        [30.0, 60.0, Color("2d3238")],
+        [60.0, 90.0, Color("242d36")],
+        [90.0, 120.0, Color("1c2a34")],
+        [120.0, 150.0, Color("162731")],
+        [150.0, 230.0, Color("0f202a")],
     ]
     for zone in zones:
         var y1 := _depth_to_y(float(zone[0]))
@@ -146,11 +164,82 @@ func _draw_geology() -> void:
     var last_depth := ceili(_scroll_depth() + size.y / maxf(PIXELS_PER_METER * _zoom(), 0.01)) + 10
     for depth_value in range(first_depth, last_depth + 1, 10):
         var y := _depth_to_y(float(depth_value))
-        if y < 0.0 or y > size.y:
+        if y < -60.0 or y > size.y + 60.0:
             continue
-        var alpha := 0.055 + accent_strength_for_depth(depth_value) * 0.06
-        var wave := sin(float(depth_value) * 0.27) * 5.0
-        draw_line(Vector2(0, y), Vector2(size.x, y + wave), Color(0.70, 0.78, 0.80, alpha), 1.0)
+        var profile: Dictionary = Layout.geology_profile(depth_value)
+        _draw_strata_band(depth_value, y, profile)
+        _draw_fractures(depth_value, y, profile)
+        _draw_rock_blocks(depth_value, y, profile)
+        _draw_small_cavities(depth_value, y, profile)
+        _draw_mineral_inclusions(depth_value, y, profile)
+
+    var shaft_shadow := Color(0.0, 0.0, 0.0, 0.10)
+    draw_rect(Rect2(size.x * 0.5 - 52.0, 0.0, 104.0, size.y), shaft_shadow)
+
+func _draw_strata_band(depth_value: int, y: float, profile: Dictionary) -> void:
+    var count := int(profile["strata_count"])
+    var cyan := float(profile["cyan_strength"])
+    for index in range(count):
+        var start_x := float(_detail_value(depth_value, index, 11, maxi(1, int(size.x))))
+        var span := 70.0 + float(_detail_value(depth_value, index, 17, 125))
+        var end_x := minf(size.x, start_x + span)
+        if end_x - start_x < 24.0:
+            start_x = maxf(0.0, start_x - 80.0)
+            end_x = minf(size.x, start_x + span)
+        var y_offset := float(_detail_value(depth_value, index, 23, 13) - 6)
+        var slope := float(_detail_value(depth_value, index, 29, 9) - 4)
+        var alpha := 0.07 + cyan * 0.08
+        draw_line(Vector2(start_x, y + y_offset), Vector2(end_x, y + y_offset + slope), Color(0.68, 0.75, 0.77, alpha), 1.0)
+
+func _draw_fractures(depth_value: int, y: float, profile: Dictionary) -> void:
+    var count := int(profile["fracture_count"])
+    var cyan := float(profile["cyan_strength"])
+    var color := Color(0.16 + cyan * 0.10, 0.20 + cyan * 0.32, 0.22 + cyan * 0.34, 0.42)
+    for index in range(count):
+        var x := 18.0 + float(_detail_value(depth_value, index, 31, maxi(1, int(maxf(1.0, size.x - 36.0)))))
+        var start := Vector2(x, y - 24.0 + float(_detail_value(depth_value, index, 37, 35)))
+        var p1 := start + Vector2(float(_detail_value(depth_value, index, 41, 17) - 8), 9.0)
+        var p2 := p1 + Vector2(float(_detail_value(depth_value, index, 43, 19) - 9), 10.0)
+        var p3 := p2 + Vector2(float(_detail_value(depth_value, index, 47, 15) - 7), 8.0)
+        draw_polyline(PackedVector2Array([start, p1, p2, p3]), color, 1.2)
+
+func _draw_rock_blocks(depth_value: int, y: float, profile: Dictionary) -> void:
+    var count := int(profile["rock_block_count"])
+    for index in range(count):
+        var x := 24.0 + float(_detail_value(depth_value, index, 53, maxi(1, int(maxf(1.0, size.x - 48.0)))))
+        var yy := y + float(_detail_value(depth_value, index, 59, 45) - 22)
+        var radius := 3.0 + float(_detail_value(depth_value, index, 61, 7))
+        var tone := 0.23 + float(_detail_value(depth_value, index, 67, 8)) * 0.012
+        draw_circle(Vector2(x, yy), radius, Color(tone, tone * 0.98, tone * 0.94, 0.52))
+
+func _draw_small_cavities(depth_value: int, y: float, profile: Dictionary) -> void:
+    var count := int(profile["cavity_count"])
+    for index in range(count):
+        var x := 50.0 + float(_detail_value(depth_value, index, 71, maxi(1, int(maxf(1.0, size.x - 100.0)))))
+        var yy := y + float(_detail_value(depth_value, index, 73, 35) - 17)
+        var rx := 13.0 + float(_detail_value(depth_value, index, 79, 13))
+        var ry := 6.0 + float(_detail_value(depth_value, index, 83, 7))
+        var points := PackedVector2Array()
+        for point_index in range(12):
+            var angle := TAU * float(point_index) / 12.0
+            points.append(Vector2(x + cos(angle) * rx, yy + sin(angle) * ry))
+        draw_colored_polygon(points, Color(0.035, 0.055, 0.065, 0.74))
+        draw_polyline(points + PackedVector2Array([points[0]]), Color(0.25, 0.33, 0.35, 0.20), 1.0)
+
+func _draw_mineral_inclusions(depth_value: int, y: float, profile: Dictionary) -> void:
+    var count := int(profile["mineral_inclusion_count"])
+    var cyan := float(profile["cyan_strength"])
+    var mineral := Color(0.78, 0.49, 0.27, 0.62) if depth_value < 90 else Color(0.25, 0.84, 0.80, 0.35 + cyan * 0.45)
+    for index in range(count):
+        var x := 28.0 + float(_detail_value(depth_value, index, 89, maxi(1, int(maxf(1.0, size.x - 56.0)))))
+        var yy := y + float(_detail_value(depth_value, index, 97, 41) - 20)
+        var length := 5.0 + float(_detail_value(depth_value, index, 101, 9))
+        draw_line(Vector2(x - length * 0.5, yy + 3.0), Vector2(x, yy - length), mineral, 1.6)
+        draw_line(Vector2(x, yy - length), Vector2(x + length * 0.5, yy + 2.0), mineral, 1.1)
+
+func _detail_value(depth_value: int, index: int, salt: int, modulus: int) -> int:
+    var safe_modulus := maxi(1, modulus)
+    return absi(depth_value * 97 + index * 53 + salt * 31 + (depth_value % 17) * 11) % safe_modulus
 
 func _draw_surface() -> void:
     var y := _depth_to_y(0.0)
