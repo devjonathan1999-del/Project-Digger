@@ -4,6 +4,7 @@ extends Control
 const Catalog = preload("res://src/industry/industry_catalog.gd")
 const Style = preload("res://src/industry/ui/industry_theme.gd")
 const MineWorldScript = preload("res://src/industry/ui/mine_world.gd")
+const MineSceneRendererScript = preload("res://src/industry/ui/mine_scene_renderer.gd")
 const SitePanelScript = preload("res://src/industry/ui/site_panel.gd")
 const IndustryPanelScript = preload("res://src/industry/ui/industry_panel.gd")
 const CenterPanelScript = preload("res://src/industry/ui/center_panel.gd")
@@ -27,6 +28,7 @@ var _content_host: VBoxContainer
 var _mine_panel: Control
 var _mine_stage: Control
 var _mine_world
+var _mine_renderer
 var _overlay_layer: Control
 var _alert_stack: VBoxContainer
 var _site_panel
@@ -204,6 +206,11 @@ func _build_mine_panel() -> void:
     world_card.add_child(_mine_world)
     _mine_world.bind_session(session)
     _mine_world.selection_changed.connect(_on_world_selection)
+
+    _mine_renderer = MineSceneRendererScript.new()
+    _mine_world.add_child(_mine_renderer)
+    _mine_world.move_child(_mine_renderer, 0)
+    _mine_renderer.bind(session, _mine_world)
 
     _overlay_layer = Control.new()
     _overlay_layer.name = "MineOverlayLayer"
