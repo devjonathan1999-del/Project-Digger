@@ -13,6 +13,12 @@ const ROCK_CRYSTAL := Color("1b2933")
 const ROCK_DEEP := Color("14212b")
 const INDUSTRIAL_AMBER := Color("d59758")
 const CRYSTAL_CYAN := Color("44d9d2")
+const STEEL := Color("72848d")
+const STEEL_DARK := Color("42545d")
+const DEEP_TURQUOISE := Color("2fb7ad")
+const ANOMALY_VIOLET := Color("b56cff")
+const WORKER_DARK := Color("182129")
+const WORKER_LIGHT := Color("b6c4c9")
 
 static func panel(color: Color = PANEL, border: Color = Color("294052"), padding: int = 16) -> StyleBoxFlat:
     var style := StyleBoxFlat.new()
