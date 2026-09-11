@@ -35,9 +35,9 @@ func _run() -> void:
         var broken = renderer.get("broken_rail_count")
         var alcoves = renderer.get("alcove_count")
         t.check(variants is Dictionary and variants.size() >= 4, "au moins quatre variantes visibles/connues")
-        t.check(int(silhouettes) >= 8, "silhouettes gauche/droite générées")
-        t.check(int(broken) >= 1, "au moins une rupture de rails")
-        t.check(int(alcoves) >= 1, "au moins un renfoncement")
+        t.check(silhouettes is int and silhouettes >= 8, "silhouettes gauche/droite générées")
+        t.check(broken is int and broken >= 1, "au moins une rupture de rails")
+        t.check(alcoves is int and alcoves >= 1, "au moins un renfoncement")
 
     var world = screen.find_child("MineWorld", true, false)
     t.check(world != null, "monde mine disponible")
