@@ -37,6 +37,24 @@ func _run() -> void:
         t.check(deep > shallow * 1.5, "accent cyan renforcé avec la profondeur")
         t.check(float(renderer.get("deep_accent_strength")) >= 0.40, "état profond transmis au renderer")
 
+    var world = screen.find_child("MineWorld", true, false)
+    t.check(world != null, "monde mine disponible")
+    if world != null:
+        for id in ["iron", "coal", "copper"]:
+            var target = world.find_child("Mine_" + id, true, false)
+            t.check(target != null, "zone tactile %s conservée" % id)
+            if target != null:
+                t.check(target.modulate.a <= 0.08, "zone %s quasi invisible" % id)
+                t.check(target.size.x >= 44.0 and target.size.y >= 34.0, "zone %s reste tactile" % id)
+            var decor_label = world.find_child("Label_" + id, true, false)
+            t.check(decor_label != null, "étiquette décorative %s séparée" % id)
+
+        var drill_target = world.find_child("Drill", true, false)
+        t.check(drill_target != null, "zone tactile foreuse conservée")
+        if drill_target != null:
+            t.check(drill_target.modulate.a <= 0.08, "zone foreuse intégrée au décor")
+        t.check(world.find_child("Label_Drill", true, false) != null, "étiquette foreuse séparée")
+
     screen.queue_free()
     await process_frame
     _cleanup()
