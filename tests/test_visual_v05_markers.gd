@@ -22,9 +22,11 @@ func _run() -> void:
     await process_frame
 
     var presenter = screen.find_child("MineInteractionPresenter", true, false)
+    var context = screen.find_child("ContextPanel", true, false)
     var iron = screen.find_child("Mine_iron", true, false)
     var copper = screen.find_child("Mine_copper", true, false)
     t.check(presenter != null, "présentateur de marqueurs disponible")
+    t.check(context != null, "panneau contextuel disponible")
     t.check(iron != null and copper != null, "zones tactiles minerais présentes")
     if presenter != null and iron != null and copper != null:
         var rest_alpha = presenter.marker_alpha("iron") if presenter.has_method("marker_alpha") else null
@@ -49,6 +51,13 @@ func _run() -> void:
         await process_frame
         t.check(presenter.marker_is_emphasized("iron") if presenter.has_method("marker_is_emphasized") else false, "clic monde conserve le marqueur sélectionné")
         t.check(iron.modulate.a <= 0.08, "bouton tactile Fer reste invisible")
+
+        if context != null:
+            context.call("clear_selection")
+            await process_frame
+            t.check(not presenter.marker_is_emphasized("iron") if presenter.has_method("marker_is_emphasized") else false, "fermeture du contexte remet le marqueur au repos")
+            var cleared_alpha = presenter.marker_alpha("iron") if presenter.has_method("marker_alpha") else null
+            t.check(cleared_alpha is float and cleared_alpha <= 0.45, "alpha de repos restauré après fermeture")
 
     screen.queue_free()
     await process_frame
