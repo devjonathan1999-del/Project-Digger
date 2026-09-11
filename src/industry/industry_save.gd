@@ -84,7 +84,12 @@ func _migrate_v1(payload: Dictionary, logical_now: float) -> Dictionary:
 
 func _finish_load(candidate, saved_at: float, logical_now: float) -> Dictionary:
     var offline_seconds := maxf(0.0, logical_now - saved_at)
+    var paused_event: Dictionary = {}
+    if not candidate.active_event.is_empty() and str(candidate.active_event.get("resource", "")) == "":
+        paused_event = candidate.active_event.duplicate(true)
     var report: Dictionary = candidate.advance(offline_seconds)
+    if not paused_event.is_empty():
+        candidate.active_event = paused_event
     # Task 3 intégrera les paliers directement à la fin des forages. Ce passage
     # idempotent garantit déjà les récompenses rétroactives pendant la migration.
     candidate.apply_retroactive_milestones()
