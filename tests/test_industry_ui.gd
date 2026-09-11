@@ -3,6 +3,7 @@ extends SceneTree
 const Support = preload("res://tests/test_support.gd")
 const Save = preload("res://src/industry/industry_save.gd")
 const Game = preload("res://src/industry/industry_game.gd")
+const Discovery = preload("res://src/industry/industry_discovery.gd")
 const PATH := "user://tests/industry_ui.json"
 const INVALID_PATH := "user://tests/industry_ui_invalid.json"
 var t = Support.new()
@@ -31,6 +32,46 @@ func _run() -> void:
     session.set_process(false)
     await process_frame
     await process_frame
+
+    var tab_mine = screen.find_child("TabMine", true, false)
+    var tab_industry = screen.find_child("TabIndustrie", true, false)
+    var tab_center = screen.find_child("TabCentre", true, false)
+    var tab_technology = screen.find_child("TabTechnologie", true, false)
+    t.check(tab_mine != null, "onglet Mine présent")
+    t.check(tab_industry != null, "onglet Industrie présent")
+    t.check(tab_center != null, "onglet Centre présent")
+    t.check(tab_technology != null, "onglet Technologie présent")
+    var mine_panel = screen.find_child("MinePanel", true, false)
+    var industry_panel = screen.find_child("IndustryPanel", true, false)
+    var center_panel = screen.find_child("CenterPanel", true, false)
+    var technology_panel = screen.find_child("TechnologyPanel", true, false)
+    t.check(mine_panel != null and mine_panel.visible, "Mine sélectionnée au démarrage")
+    t.check(industry_panel != null and not industry_panel.visible, "Industrie masquée au démarrage")
+    t.check(center_panel != null and not center_panel.visible, "Centre masqué au démarrage")
+    t.check(technology_panel != null and not technology_panel.visible, "Technologie masquée au démarrage")
+
+    var mine_world = screen.find_child("MineWorld", true, false)
+    t.check(mine_world != null, "vue mine verticale présente")
+    if mine_world != null:
+        t.check(float(mine_world.get("min_zoom")) >= 0.7, "zoom minimum borné")
+        t.check(float(mine_world.get("max_zoom")) <= 1.25, "zoom maximum borné")
+    session.game.discoveries["30:0"] = Discovery.generate(123, 30, 0, 0.0)
+    session.changed.emit()
+    await process_frame
+    var discovery_target = screen.find_child("Discovery_30_0", true, false)
+    t.check(discovery_target != null, "cible de découverte présente dans le monde")
+    if discovery_target != null:
+        await _click(discovery_target)
+    var context_panel = screen.find_child("ContextPanel", true, false)
+    t.check(context_panel != null and context_panel.visible, "clic découverte ouvre le panneau contextuel")
+
+    if tab_industry != null:
+        await _click(tab_industry)
+    t.check(industry_panel != null and industry_panel.visible, "clic Industrie affiche le panneau industriel")
+    t.check(screen.find_child("FurnaceStart", true, false) != null, "fonderie conservée dans Industrie")
+    t.check(screen.find_child("WorkshopStart", true, false) != null, "atelier conservé dans Industrie")
+    t.check(screen.find_child("MineUpgrade_iron", true, false) != null, "amélioration de mine conservée dans Industrie")
+
     t.check(screen.find_child("OfflineNotice", true, false).visible, "bilan de retour affiché après dix secondes")
     var quantity = screen.find_child("FurnaceQuantity", true, false)
     quantity.value = 3
@@ -50,6 +91,9 @@ func _run() -> void:
     session.advance_to(session.last_seen_unix + 51.0)
     await _click(screen.find_child("WorkshopStart", true, false))
     session.advance_to(session.last_seen_unix + 41.0)
+
+    if tab_mine != null:
+        await _click(tab_mine)
     await _click(screen.find_child("DrillUpgrade", true, false))
     t.equal(session.game.drill_level, 2, "le bouton améliore la foreuse après fabrication")
     await _click(screen.find_child("ExcavationStart", true, false))
@@ -57,6 +101,9 @@ func _run() -> void:
     t.equal(session.game.depth, 10, "le bouton chantier permet de gagner dix mètres")
     t.check(session.persist(), "parcours UI enregistré")
     t.equal(Save.new().load_game(PATH, session.last_seen_unix)["game"].depth, 10, "parcours UI rechargé")
+
+    if tab_industry != null:
+        await _click(tab_industry)
     await _click(screen.find_child("MineUpgrade_iron", true, false))
     t.equal(session.game.mine_levels["iron"], 2, "le bouton mine améliore le débit")
     t.equal(recipe.selected, 1, "la mise à jour conserve la recette sélectionnée")
@@ -91,7 +138,6 @@ func _run() -> void:
     print("Industry UI: %s" % ("PASS" if t.failures == 0 else "FAIL"))
     quit(t.finish())
 
-
 func _page_text(screen: Control) -> String:
     var texts := PackedStringArray()
     for label in screen.find_children("*", "Label", true, false):
@@ -119,6 +165,9 @@ func _invalid_load(normal_screen: Control, folder: String) -> void:
     t.check(notice.text.contains("progression de cette session provisoire ne sera pas enregistrée"), "la notice explique la perte de progression provisoire")
     t.check(not _page_text(blocked_screen).contains("Progression enregistrée automatiquement"), "le pied de page bloqué ne promet pas la sauvegarde")
     t.check(_page_text(blocked_screen).contains("Enregistrement désactivé"), "le pied de page reflète le blocage")
+    var blocked_industry_tab = blocked_screen.find_child("TabIndustrie", true, false)
+    if blocked_industry_tab != null:
+        await _click(blocked_industry_tab)
     await _click(blocked_screen.find_child("FurnaceStart", true, false))
     t.check(blocked_session.game.jobs.has("furnace"), "la session provisoire reste jouable")
     t.check(not blocked_session.persist(), "aucun enregistrement de la session provisoire")
@@ -133,6 +182,9 @@ func _invalid_load(normal_screen: Control, folder: String) -> void:
     t.check(_page_text(normal_screen).contains("Progression enregistrée automatiquement"), "la session normale reste correctement affichée après la capture bloquée")
 
 func _click(button: Button) -> void:
+    t.check(button != null, "bouton présent avant clic")
+    if button == null:
+        return
     var scroll = button.find_parent("PageScroll") as ScrollContainer
     if scroll != null:
         scroll.ensure_control_visible(button)

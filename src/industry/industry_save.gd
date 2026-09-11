@@ -2,7 +2,9 @@ class_name IndustrySave
 extends RefCounted
 
 const IndustryGameScript = preload("res://src/industry/industry_game.gd")
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
+const LEGACY_VERSION := 1
+const MAX_SAFE_SEED := 2147483646
 const DEFAULT_PATH := "user://industry_v1.json"
 
 func save_game(path: String, game, saved_at_unix: float) -> bool:
@@ -65,12 +67,32 @@ func load_game(path: String, now_unix: float) -> Dictionary:
     if typeof(payload["industry"]) != TYPE_DICTIONARY:
         return _new_result(logical_now, "État industriel invalide")
 
+    if int(payload["version"]) == LEGACY_VERSION:
+        return _migrate_v1(payload, logical_now)
+
     var candidate = IndustryGameScript.new()
     if not candidate.restore(payload["industry"]):
         return _new_result(logical_now, "État industriel incohérent")
-    var saved_at := float(payload["saved_at_unix"])
+    return _finish_load(candidate, float(payload["saved_at_unix"]), logical_now)
+
+func _migrate_v1(payload: Dictionary, logical_now: float) -> Dictionary:
+    var candidate = IndustryGameScript.new()
+    var seed := _normalized_seed(hash(JSON.stringify(payload)))
+    if not candidate.restore_v1(payload["industry"], seed):
+        return _new_result(logical_now, "État industriel v1 incohérent")
+    return _finish_load(candidate, float(payload["saved_at_unix"]), logical_now)
+
+func _finish_load(candidate, saved_at: float, logical_now: float) -> Dictionary:
     var offline_seconds := maxf(0.0, logical_now - saved_at)
+    var paused_event: Dictionary = {}
+    if not candidate.active_event.is_empty() and str(candidate.active_event.get("resource", "")) == "":
+        paused_event = candidate.active_event.duplicate(true)
     var report: Dictionary = candidate.advance(offline_seconds)
+    if not paused_event.is_empty():
+        candidate.active_event = paused_event
+    # Task 3 intégrera les paliers directement à la fin des forages. Ce passage
+    # idempotent garantit déjà les récompenses rétroactives pendant la migration.
+    candidate.apply_retroactive_milestones()
     return {
         "game": candidate,
         "saved_at_unix": maxf(saved_at, logical_now),
@@ -81,6 +103,8 @@ func load_game(path: String, now_unix: float) -> Dictionary:
 
 func _new_result(saved_at_unix: float, error: String) -> Dictionary:
     var game = IndustryGameScript.new()
+    if error == "":
+        game.world_seed = _seed_from(saved_at_unix)
     return {
         "game": game,
         "saved_at_unix": saved_at_unix,
@@ -89,10 +113,18 @@ func _new_result(saved_at_unix: float, error: String) -> Dictionary:
         "error": error,
     }
 
+func _seed_from(value: float) -> int:
+    return _normalized_seed(hash(str(value)))
+
+func _normalized_seed(value: int) -> int:
+    return abs(value % MAX_SAFE_SEED) + 1
+
 func _valid_version(value: Variant) -> bool:
     if typeof(value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value)):
         return false
-    return float(value) == floor(float(value)) and int(value) == SAVE_VERSION
+    if float(value) != floor(float(value)):
+        return false
+    return int(value) in [LEGACY_VERSION, SAVE_VERSION]
 
 func _valid_timestamp(value: Variant) -> bool:
     return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) >= 0.0

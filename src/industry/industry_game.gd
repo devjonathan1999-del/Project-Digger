@@ -2,7 +2,11 @@ class_name IndustryGame
 extends RefCounted
 
 const Catalog = preload("res://src/industry/industry_catalog.gd")
+const Discovery = preload("res://src/industry/industry_discovery.gd")
 const FACILITIES: Array[String] = ["furnace", "workshop", "drill"]
+const V1_RESOURCE_IDS := ["iron", "coal", "copper", "iron_ingot", "copper_ingot", "cable"]
+const PRIORITY_BRANCHES := ["production", "logistics", "exploration"]
+const PRIORITY_COOLDOWN_SECONDS := 300.0
 const EPSILON := 0.000001
 
 var resources: Dictionary = {
@@ -12,30 +16,53 @@ var resources: Dictionary = {
     "iron_ingot": 0.0,
     "copper_ingot": 0.0,
     "cable": 0.0,
+    "crystal": 0.0,
 }
 var mine_levels: Dictionary = {"iron": 1, "coal": 1, "copper": 1}
 var drill_level: int = 1
 var depth: int = 0
 var jobs: Dictionary = {}
 
+var center_level: int = 1
+var permanent_sites: Dictionary = {}
+var discoveries: Dictionary = {}
+var explorations: Dictionary = {}
+var claimed_milestones: Array = []
+var tech_points: int = 0
+var unlocked_technologies: Array = []
+var built_technologies: Array = []
+var priority_branch: String = ""
+var priority_cooldown_remaining: float = 0.0
+var active_event: Dictionary = {}
+var pending_events: Array = []
+var world_seed: int = 1
+
 func advance(seconds: float) -> Dictionary:
-    var report := {"produced": {}, "completed": [], "depth_gained": 0}
+    var report := {"produced": {}, "completed": [], "depth_gained": 0, "events_expired": []}
     if not is_finite(seconds) or seconds <= 0.0:
         return report
 
     var elapsed_remaining := seconds
     while elapsed_remaining > 0.0:
-        if jobs.is_empty():
-            _produce_minerals(elapsed_remaining, report["produced"])
+        if jobs.is_empty() and explorations.is_empty() and active_event.is_empty():
+            _advance_for_duration(elapsed_remaining, report["produced"])
             break
 
         var segment := elapsed_remaining
         for job in jobs.values():
             segment = minf(segment, float(job["remaining"]))
+        for exploration in explorations.values():
+            segment = minf(segment, float(exploration["remaining"]))
+        if not active_event.is_empty():
+            segment = minf(segment, float(active_event["remaining"]))
 
-        _produce_minerals(segment, report["produced"])
+        _advance_for_duration(segment, report["produced"])
         for job in jobs.values():
             job["remaining"] = maxf(0.0, float(job["remaining"]) - segment)
+        for exploration in explorations.values():
+            exploration["remaining"] = maxf(0.0, float(exploration["remaining"]) - segment)
+        if not active_event.is_empty():
+            active_event["remaining"] = maxf(0.0, float(active_event["remaining"]) - segment)
         elapsed_remaining -= segment
 
         for facility in FACILITIES:
@@ -48,12 +75,26 @@ func advance(seconds: float) -> Dictionary:
                 var previous_depth := depth
                 depth = int(completed_job["target_depth"])
                 report["depth_gained"] += depth - previous_depth
+                _apply_milestones_up_to(depth)
+                _generate_depth_discoveries(depth)
             else:
                 var recipe: Dictionary = Catalog.RECIPES[completed_job["recipe"]]
                 var output: String = recipe["output"]
                 var amount: int = int(completed_job["quantity"])
                 resources[output] = float(resources[output]) + amount
                 _add_produced(report["produced"], output, amount)
+
+        var finished_explorations: Array[String] = []
+        for discovery_id in explorations:
+            if float(explorations[discovery_id]["remaining"]) <= 0.0:
+                finished_explorations.append(str(discovery_id))
+        for discovery_id in finished_explorations:
+            explorations.erase(discovery_id)
+            _complete_exploration(discovery_id, report["produced"])
+
+        if not active_event.is_empty() and float(active_event["remaining"]) <= 0.0:
+            report["events_expired"].append(str(active_event["type"]))
+            active_event = {}
 
     return report
 
@@ -64,32 +105,272 @@ func snapshot() -> Dictionary:
         "drill_level": drill_level,
         "depth": depth,
         "jobs": jobs.duplicate(true),
+        "center_level": center_level,
+        "permanent_sites": permanent_sites.duplicate(true),
+        "discoveries": discoveries.duplicate(true),
+        "explorations": explorations.duplicate(true),
+        "claimed_milestones": claimed_milestones.duplicate(true),
+        "tech_points": tech_points,
+        "unlocked_technologies": unlocked_technologies.duplicate(true),
+        "built_technologies": built_technologies.duplicate(true),
+        "priority_branch": priority_branch,
+        "priority_cooldown_remaining": priority_cooldown_remaining,
+        "active_event": active_event.duplicate(true),
+        "pending_events": pending_events.duplicate(true),
+        "world_seed": world_seed,
     }
 
 func restore(data: Dictionary) -> bool:
     if not _valid_snapshot(data):
         return false
 
+    _restore_core(data)
+    center_level = int(data["center_level"])
+    permanent_sites = data["permanent_sites"].duplicate(true)
+    discoveries = data["discoveries"].duplicate(true)
+    explorations = data["explorations"].duplicate(true)
+    claimed_milestones = _integer_array(data["claimed_milestones"])
+    tech_points = int(data["tech_points"])
+    unlocked_technologies = data["unlocked_technologies"].duplicate(true)
+    built_technologies = data["built_technologies"].duplicate(true)
+    priority_branch = str(data["priority_branch"])
+    priority_cooldown_remaining = float(data["priority_cooldown_remaining"])
+    active_event = data["active_event"].duplicate(true)
+    pending_events = data["pending_events"].duplicate(true)
+    world_seed = int(data["world_seed"])
+    return true
+
+func restore_v1(data: Dictionary, seed: int) -> bool:
+    if seed == 0 or not _valid_v1_snapshot(data):
+        return false
+
     var restored_resources: Dictionary = data["resources"].duplicate(true)
     for id in restored_resources:
         restored_resources[id] = float(restored_resources[id])
+    restored_resources["crystal"] = 0.0
+    resources = restored_resources
+
     var restored_levels: Dictionary = data["mine_levels"].duplicate(true)
     for id in restored_levels:
         restored_levels[id] = int(restored_levels[id])
-    var restored_jobs: Dictionary = data["jobs"].duplicate(true)
-    for facility in restored_jobs:
-        restored_jobs[facility]["remaining"] = float(restored_jobs[facility]["remaining"])
-        restored_jobs[facility]["duration"] = float(restored_jobs[facility]["duration"])
-        if facility == "drill":
-            restored_jobs[facility]["target_depth"] = int(restored_jobs[facility]["target_depth"])
-        else:
-            restored_jobs[facility]["quantity"] = int(restored_jobs[facility]["quantity"])
-
-    resources = restored_resources
     mine_levels = restored_levels
     drill_level = int(data["drill_level"])
     depth = int(data["depth"])
-    jobs = restored_jobs
+    jobs = _restored_jobs(data["jobs"])
+
+    center_level = 1
+    permanent_sites = {}
+    discoveries = {}
+    explorations = {}
+    claimed_milestones = []
+    tech_points = 0
+    unlocked_technologies = []
+    built_technologies = []
+    priority_branch = ""
+    priority_cooldown_remaining = 0.0
+    active_event = {}
+    pending_events = []
+    world_seed = seed
+    return true
+
+func apply_retroactive_milestones() -> void:
+    _apply_milestones_up_to(depth)
+    for generated_depth in range(30, depth + 1, 10):
+        _generate_depth_discoveries(generated_depth)
+
+func discoveries_for_depth(target_depth: int) -> Array:
+    var result: Array = []
+    for discovery in discoveries.values():
+        if int(discovery.get("depth", -1)) == target_depth:
+            result.append(discovery.duplicate(true))
+    result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("slot", 0)) < int(b.get("slot", 0)))
+    return result
+
+func production_multiplier() -> float:
+    var value := 1.0
+    if "production_1" in built_technologies:
+        value += float(Catalog.TECHNOLOGIES["production_1"]["effect"])
+    if priority_branch == "production":
+        value += float(Catalog.PRIORITY_BONUSES["production"]["production_rate"])
+    return value
+
+func quality_floor() -> float:
+    var value := 0.0
+    if "exploration_1" in built_technologies:
+        value += float(Catalog.TECHNOLOGIES["exploration_1"]["effect"])
+    if priority_branch == "exploration":
+        value += float(Catalog.PRIORITY_BONUSES["exploration"]["quality_floor"])
+    return clampf(value, 0.0, 0.8)
+
+func total_capacity() -> int:
+    return _capacity_for_priority(priority_branch)
+
+func used_capacity() -> int:
+    var total := 0
+    for site in permanent_sites.values():
+        if bool(site.get("active", false)):
+            total += int(site.get("capacity", 0))
+    return total
+
+func center_upgrade_block_reason() -> String:
+    var next_level := center_level + 1
+    if not Catalog.CENTER_LEVELS.has(next_level):
+        return "Centre au niveau maximum"
+    var definition: Dictionary = Catalog.CENTER_LEVELS[next_level]
+    if depth < int(definition["depth"]):
+        return "Profondeur insuffisante"
+    if not can_afford(definition["cost"]):
+        return "Ressources insuffisantes"
+    return ""
+
+func upgrade_center() -> bool:
+    if center_upgrade_block_reason() != "":
+        return false
+    var next_level := center_level + 1
+    var definition: Dictionary = Catalog.CENTER_LEVELS[next_level]
+    _spend(definition["cost"])
+    center_level = next_level
+    return true
+
+func exploration_block_reason(discovery_id: String) -> String:
+    if not discoveries.has(discovery_id):
+        return "Découverte inconnue"
+    var discovery: Dictionary = discoveries[discovery_id]
+    if str(discovery.get("state", "")) != "detected":
+        return "Découverte déjà traitée"
+    if explorations.has(discovery_id):
+        return "Exploration déjà en cours"
+    var type_id := str(discovery.get("type", ""))
+    if not Catalog.POCKET_TYPES.has(type_id):
+        return "Type de découverte inconnu"
+    var definition: Dictionary = Catalog.POCKET_TYPES[type_id]
+    if not can_afford(definition["cost"]):
+        return "Ressources insuffisantes"
+    return ""
+
+func start_exploration(discovery_id: String) -> bool:
+    if exploration_block_reason(discovery_id) != "":
+        return false
+    var discovery: Dictionary = discoveries[discovery_id]
+    var definition: Dictionary = Catalog.POCKET_TYPES[str(discovery["type"])]
+    _spend(definition["cost"])
+    var duration := float(definition["seconds"])
+    explorations[discovery_id] = {
+        "discovery_id": discovery_id,
+        "remaining": duration,
+        "duration": duration,
+    }
+    discovery["state"] = "exploring"
+    discoveries[discovery_id] = discovery
+    return true
+
+func site_toggle_block_reason(site_id: String, active: bool) -> String:
+    if not permanent_sites.has(site_id):
+        return "Site inconnu"
+    var site: Dictionary = permanent_sites[site_id]
+    if bool(site.get("active", false)) == active:
+        return "Site déjà dans cet état"
+    if active and used_capacity() + int(site.get("capacity", 0)) > total_capacity():
+        return "Capacité d'exploitation insuffisante"
+    return ""
+
+func set_site_active(site_id: String, active: bool) -> bool:
+    if site_toggle_block_reason(site_id, active) != "":
+        return false
+    var site: Dictionary = permanent_sites[site_id]
+    site["active"] = active
+    permanent_sites[site_id] = site
+    if discoveries.has(site_id):
+        var discovery: Dictionary = discoveries[site_id]
+        discovery["active"] = active
+        discoveries[site_id] = discovery
+    return true
+
+func technology_unlock_block_reason(id: String) -> String:
+    if not Catalog.TECHNOLOGIES.has(id):
+        return "Technologie inconnue"
+    if depth < 90:
+        return "Technologies disponibles à partir de 90 m"
+    if id in unlocked_technologies:
+        return "Technologie déjà débloquée"
+    var required_points := int(Catalog.TECHNOLOGIES[id].get("tech_points", 1))
+    if tech_points < required_points:
+        return "Point technologique insuffisant"
+    return ""
+
+func unlock_technology(id: String) -> bool:
+    if technology_unlock_block_reason(id) != "":
+        return false
+    tech_points -= int(Catalog.TECHNOLOGIES[id].get("tech_points", 1))
+    unlocked_technologies.append(id)
+    return true
+
+func technology_build_block_reason(id: String) -> String:
+    if not Catalog.TECHNOLOGIES.has(id):
+        return "Technologie inconnue"
+    if id not in unlocked_technologies:
+        return "Technologie non débloquée"
+    if id in built_technologies:
+        return "Technologie déjà construite"
+    var cost: Dictionary = Catalog.TECHNOLOGIES[id]["cost"]
+    if not can_afford(cost):
+        return "Ressources insuffisantes"
+    return ""
+
+func build_technology(id: String) -> bool:
+    if technology_build_block_reason(id) != "":
+        return false
+    _spend(Catalog.TECHNOLOGIES[id]["cost"])
+    built_technologies.append(id)
+    return true
+
+func priority_block_reason(branch: String) -> String:
+    if branch not in PRIORITY_BRANCHES:
+        return "Branche inconnue"
+    if depth < 90:
+        return "Spécialisations disponibles à partir de 90 m"
+    if branch == priority_branch:
+        return "Branche déjà prioritaire"
+    if priority_cooldown_remaining > EPSILON:
+        return "Changement de priorité en recharge"
+    if used_capacity() > _capacity_for_priority(branch):
+        return "Désactivez un site avant de quitter la priorité Logistique"
+    return ""
+
+func set_priority(branch: String) -> bool:
+    if priority_block_reason(branch) != "":
+        return false
+    priority_branch = branch
+    priority_cooldown_remaining = PRIORITY_COOLDOWN_SECONDS
+    return true
+
+func present_pending_event() -> bool:
+    if not active_event.is_empty() or pending_events.is_empty():
+        return false
+    var pending = pending_events.pop_front()
+    if typeof(pending) != TYPE_DICTIONARY:
+        return false
+    var type_id := str(pending.get("type", ""))
+    if not Catalog.EVENTS.has(type_id):
+        return false
+    var duration := float(Catalog.EVENTS[type_id]["duration"])
+    active_event = {
+        "type": type_id,
+        "remaining": duration,
+        "duration": duration,
+        "resource": "",
+    }
+    return true
+
+func choose_event_resource(resource_id: String) -> bool:
+    if active_event.is_empty():
+        return false
+    var type_id := str(active_event.get("type", ""))
+    if not Catalog.EVENTS.has(type_id):
+        return false
+    if resource_id not in Catalog.EVENTS[type_id]["choices"]:
+        return false
+    active_event["resource"] = resource_id
     return true
 
 func can_afford(cost: Dictionary) -> bool:
@@ -104,7 +385,12 @@ func mine_rate(id: String) -> float:
     if not Catalog.MINES.has(id) or not mine_levels.has(id):
         return 0.0
     var depth_bonus := 1.0 + 0.15 * floori(float(depth) / 30.0)
-    return float(Catalog.MINES[id]["base_rate"]) * int(mine_levels[id]) * depth_bonus
+    var event_multiplier := 1.0
+    if not active_event.is_empty() and str(active_event.get("resource", "")) == id:
+        var event_type := str(active_event.get("type", ""))
+        if Catalog.EVENTS.has(event_type):
+            event_multiplier += float(Catalog.EVENTS[event_type].get("rate_bonus", 0.0))
+    return float(Catalog.MINES[id]["base_rate"]) * int(mine_levels[id]) * depth_bonus * production_multiplier() * event_multiplier
 
 func mine_upgrade_cost(id: String) -> Dictionary:
     if not Catalog.MINES.has(id) or not mine_levels.has(id):
@@ -132,7 +418,10 @@ func batch_block_reason(recipe: String, quantity: int) -> String:
 func excavation_block_reason() -> String:
     if jobs.has("drill"):
         return "Foreuse occupée"
-    var required_level := mini(Catalog.MAX_DRILL_LEVEL, 1 + floori(float(depth + 10) / 30.0))
+    var target_depth := depth + 10
+    var required_level := mini(Catalog.MAX_DRILL_LEVEL, 1 + floori(float(target_depth) / 30.0))
+    if Catalog.MILESTONES.has(target_depth):
+        required_level = maxi(required_level, int(Catalog.MILESTONES[target_depth].get("requires_drill", 1)))
     if drill_level < required_level:
         return "Niveau de foreuse insuffisant"
     return ""
@@ -188,11 +477,99 @@ func start_excavation() -> bool:
     }
     return true
 
+func _capacity_for_priority(branch: String) -> int:
+    var value := int(Catalog.CENTER_LEVELS[center_level]["capacity"])
+    if "logistics_1" in built_technologies:
+        value += int(Catalog.TECHNOLOGIES["logistics_1"]["effect"])
+    if branch == "logistics":
+        value += int(Catalog.PRIORITY_BONUSES["logistics"]["capacity"])
+    return value
+
+func _apply_milestones_up_to(target_depth: int) -> void:
+    for milestone_depth in Catalog.MILESTONES:
+        var milestone := int(milestone_depth)
+        if milestone > target_depth or milestone in claimed_milestones:
+            continue
+        tech_points += int(Catalog.MILESTONES[milestone].get("tech_points", 0))
+        claimed_milestones.append(milestone)
+    claimed_milestones.sort()
+
+func _generate_depth_discoveries(target_depth: int) -> void:
+    if not Discovery.should_generate(world_seed, target_depth, 0):
+        return
+    _ensure_discovery(target_depth, 0)
+
+func _ensure_discovery(target_depth: int, slot: int) -> void:
+    var id := "%d:%d" % [target_depth, slot]
+    if discoveries.has(id):
+        return
+    discoveries[id] = Discovery.generate(world_seed, target_depth, slot, quality_floor())
+
+func _advance_for_duration(seconds: float, produced: Dictionary) -> void:
+    _produce_minerals(seconds, produced)
+    _produce_permanent_sites(seconds, produced)
+    priority_cooldown_remaining = maxf(0.0, priority_cooldown_remaining - seconds)
+
 func _produce_minerals(seconds: float, produced: Dictionary) -> void:
     for id in Catalog.MINES:
         var amount := mine_rate(id) * seconds
         resources[id] = float(resources[id]) + amount
         _add_produced(produced, id, amount)
+
+func _produce_permanent_sites(seconds: float, produced: Dictionary) -> void:
+    for site in permanent_sites.values():
+        if not bool(site.get("active", false)):
+            continue
+        if str(site.get("type", "")) != "crystal_cavern":
+            continue
+        var rate := float(site.get("rate", 0.0))
+        if rate <= 0.0:
+            continue
+        var amount := rate * seconds
+        resources["crystal"] = float(resources["crystal"]) + amount
+        _add_produced(produced, "crystal", amount)
+
+func _complete_exploration(discovery_id: String, produced: Dictionary) -> void:
+    if not discoveries.has(discovery_id):
+        return
+    var discovery: Dictionary = discoveries[discovery_id]
+    var type_id := str(discovery.get("type", ""))
+    if not Catalog.POCKET_TYPES.has(type_id):
+        return
+    var definition: Dictionary = Catalog.POCKET_TYPES[type_id]
+    var reward: Dictionary = discovery.get("reward", {})
+
+    if str(definition["kind"]) == "exhaustible":
+        if reward.has("resource") and reward.has("amount"):
+            var resource_id := str(reward["resource"])
+            var amount := float(reward["amount"])
+            if resources.has(resource_id):
+                resources[resource_id] = float(resources[resource_id]) + amount
+                _add_produced(produced, resource_id, amount)
+        if reward.has("tech_points"):
+            tech_points += int(reward["tech_points"])
+        if reward.has("event") and Catalog.EVENTS.has(str(reward["event"])):
+            pending_events.append({"type": str(reward["event"]), "presented": false})
+        discovery["state"] = "exhausted"
+        discovery["active"] = false
+        discoveries[discovery_id] = discovery
+        return
+
+    var site := {
+        "type": type_id,
+        "active": false,
+        "capacity": int(definition.get("capacity", 0)),
+        "depth": int(discovery.get("depth", 0)),
+        "level": 1,
+        "rate": float(reward.get("rate", 0.0)),
+    }
+    if reward.has("tech_points"):
+        tech_points += int(reward["tech_points"])
+    site["active"] = used_capacity() + int(site["capacity"]) <= total_capacity()
+    permanent_sites[discovery_id] = site
+    discovery["state"] = "opened"
+    discovery["active"] = bool(site["active"])
+    discoveries[discovery_id] = discovery
 
 func _add_produced(produced: Dictionary, id: String, amount: float) -> void:
     produced[id] = float(produced.get(id, 0.0)) + amount
@@ -207,10 +584,106 @@ func _spend(cost: Dictionary) -> void:
     for id in cost:
         resources[id] = float(resources[id]) - float(cost[id])
 
+func _restore_core(data: Dictionary) -> void:
+    var restored_resources: Dictionary = data["resources"].duplicate(true)
+    for id in restored_resources:
+        restored_resources[id] = float(restored_resources[id])
+    resources = restored_resources
+
+    var restored_levels: Dictionary = data["mine_levels"].duplicate(true)
+    for id in restored_levels:
+        restored_levels[id] = int(restored_levels[id])
+    mine_levels = restored_levels
+    drill_level = int(data["drill_level"])
+    depth = int(data["depth"])
+    jobs = _restored_jobs(data["jobs"])
+
+func _restored_jobs(source: Dictionary) -> Dictionary:
+    var restored_jobs: Dictionary = source.duplicate(true)
+    for facility in restored_jobs:
+        restored_jobs[facility]["remaining"] = float(restored_jobs[facility]["remaining"])
+        restored_jobs[facility]["duration"] = float(restored_jobs[facility]["duration"])
+        if facility == "drill":
+            restored_jobs[facility]["target_depth"] = int(restored_jobs[facility]["target_depth"])
+        else:
+            restored_jobs[facility]["quantity"] = int(restored_jobs[facility]["quantity"])
+    return restored_jobs
+
 func _valid_snapshot(data: Dictionary) -> bool:
+    var keys := [
+        "resources", "mine_levels", "drill_level", "depth", "jobs",
+        "center_level", "permanent_sites", "discoveries", "explorations",
+        "claimed_milestones", "tech_points", "unlocked_technologies",
+        "built_technologies", "priority_branch", "priority_cooldown_remaining",
+        "active_event", "pending_events", "world_seed",
+    ]
+    if not _has_exact_keys(data, keys):
+        return false
+    if not _valid_core_values(data, Catalog.RESOURCES.keys()):
+        return false
+    if not _valid_integer(data["center_level"], 1, Catalog.CENTER_LEVELS.size()):
+        return false
+    if not _valid_discoveries(data["discoveries"]):
+        return false
+    if not _valid_permanent_sites(data["permanent_sites"]):
+        return false
+    if not _valid_explorations(data["explorations"], data["discoveries"]):
+        return false
+    if not _valid_claimed_milestones(data["claimed_milestones"]):
+        return false
+    if not _valid_integer(data["tech_points"], 0):
+        return false
+    if not _valid_technology_array(data["unlocked_technologies"]) or not _valid_technology_array(data["built_technologies"]):
+        return false
+    for id in data["built_technologies"]:
+        if id not in data["unlocked_technologies"]:
+            return false
+    if typeof(data["priority_branch"]) != TYPE_STRING or (data["priority_branch"] != "" and data["priority_branch"] not in PRIORITY_BRANCHES):
+        return false
+    if not _finite_number(data["priority_cooldown_remaining"]) or float(data["priority_cooldown_remaining"]) < 0.0:
+        return false
+    if not _valid_active_event(data["active_event"]):
+        return false
+    if typeof(data["pending_events"]) != TYPE_ARRAY:
+        return false
+    for event in data["pending_events"]:
+        if typeof(event) != TYPE_DICTIONARY:
+            return false
+        if not _has_exact_keys(event, ["type", "presented"]):
+            return false
+        if not Catalog.EVENTS.has(str(event["type"])) or typeof(event["presented"]) != TYPE_BOOL:
+            return false
+    if not _valid_integer(data["world_seed"], 1, 2147483647):
+        return false
+    return true
+
+func _valid_active_event(value: Variant) -> bool:
+    if typeof(value) != TYPE_DICTIONARY:
+        return false
+    var event: Dictionary = value
+    if event.is_empty():
+        return true
+    if not _has_exact_keys(event, ["type", "remaining", "duration", "resource"]):
+        return false
+    var type_id := str(event["type"])
+    if not Catalog.EVENTS.has(type_id):
+        return false
+    if not _valid_job_times(event):
+        return false
+    if not is_equal_approx(float(event["duration"]), float(Catalog.EVENTS[type_id]["duration"])):
+        return false
+    if typeof(event["resource"]) != TYPE_STRING:
+        return false
+    var resource_id := str(event["resource"])
+    return resource_id == "" or resource_id in Catalog.EVENTS[type_id]["choices"]
+
+func _valid_v1_snapshot(data: Dictionary) -> bool:
     if not _has_exact_keys(data, ["resources", "mine_levels", "drill_level", "depth", "jobs"]):
         return false
-    if typeof(data["resources"]) != TYPE_DICTIONARY or not _has_exact_keys(data["resources"], Catalog.RESOURCES.keys()):
+    return _valid_core_values(data, V1_RESOURCE_IDS)
+
+func _valid_core_values(data: Dictionary, resource_ids: Array) -> bool:
+    if typeof(data["resources"]) != TYPE_DICTIONARY or not _has_exact_keys(data["resources"], resource_ids):
         return false
     for value in data["resources"].values():
         if not _finite_number(value) or float(value) < 0.0:
@@ -241,6 +714,105 @@ func _valid_snapshot(data: Dictionary) -> bool:
             return false
     return true
 
+func _valid_discoveries(value: Variant) -> bool:
+    if typeof(value) != TYPE_DICTIONARY:
+        return false
+    for key in value:
+        if typeof(key) != TYPE_STRING or typeof(value[key]) != TYPE_DICTIONARY:
+            return false
+        var discovery: Dictionary = value[key]
+        if not _has_exact_keys(discovery, ["id", "depth", "slot", "type", "kind", "hint", "quality", "reward", "state", "active"]):
+            return false
+        if str(discovery["id"]) != str(key):
+            return false
+        if not _valid_integer(discovery["depth"], 0) or int(discovery["depth"]) % 10 != 0:
+            return false
+        if not _valid_integer(discovery["slot"], 0):
+            return false
+        var type_id := str(discovery["type"])
+        if not Catalog.POCKET_TYPES.has(type_id):
+            return false
+        var definition: Dictionary = Catalog.POCKET_TYPES[type_id]
+        if str(discovery["kind"]) != str(definition["kind"]) or typeof(discovery["hint"]) != TYPE_STRING:
+            return false
+        if not _finite_number(discovery["quality"]) or float(discovery["quality"]) < 0.0 or float(discovery["quality"]) > 1.0:
+            return false
+        if typeof(discovery["reward"]) != TYPE_DICTIONARY:
+            return false
+        if str(discovery["state"]) not in ["detected", "exploring", "exhausted", "opened"]:
+            return false
+        if typeof(discovery["active"]) != TYPE_BOOL:
+            return false
+    return true
+
+func _valid_permanent_sites(value: Variant) -> bool:
+    if typeof(value) != TYPE_DICTIONARY:
+        return false
+    for key in value:
+        if typeof(key) != TYPE_STRING or typeof(value[key]) != TYPE_DICTIONARY:
+            return false
+        var site: Dictionary = value[key]
+        if not _has_exact_keys(site, ["type", "active", "capacity", "depth", "level", "rate"]):
+            return false
+        var type_id := str(site["type"])
+        if not Catalog.POCKET_TYPES.has(type_id) or str(Catalog.POCKET_TYPES[type_id]["kind"]) != "permanent":
+            return false
+        if typeof(site["active"]) != TYPE_BOOL:
+            return false
+        if not _valid_integer(site["capacity"], 0):
+            return false
+        if not _valid_integer(site["depth"], 0) or int(site["depth"]) % 10 != 0:
+            return false
+        if not _valid_integer(site["level"], 1):
+            return false
+        if not _finite_number(site["rate"]) or float(site["rate"]) < 0.0:
+            return false
+    return true
+
+func _valid_explorations(value: Variant, discovery_map: Dictionary) -> bool:
+    if typeof(value) != TYPE_DICTIONARY:
+        return false
+    for key in value:
+        if typeof(key) != TYPE_STRING or typeof(value[key]) != TYPE_DICTIONARY:
+            return false
+        if not discovery_map.has(key) or str(discovery_map[key].get("state", "")) != "exploring":
+            return false
+        var exploration: Dictionary = value[key]
+        if not _has_exact_keys(exploration, ["discovery_id", "remaining", "duration"]):
+            return false
+        if str(exploration["discovery_id"]) != str(key) or not _valid_job_times(exploration):
+            return false
+    return true
+
+func _valid_claimed_milestones(value: Variant) -> bool:
+    if typeof(value) != TYPE_ARRAY:
+        return false
+    var seen := {}
+    for entry in value:
+        if not _valid_integer(entry, 0):
+            return false
+        var milestone := int(entry)
+        if not Catalog.MILESTONES.has(milestone) or seen.has(milestone):
+            return false
+        seen[milestone] = true
+    return true
+
+func _valid_technology_array(value: Variant) -> bool:
+    if typeof(value) != TYPE_ARRAY:
+        return false
+    var seen := {}
+    for id in value:
+        if typeof(id) != TYPE_STRING or not Catalog.TECHNOLOGIES.has(id) or seen.has(id):
+            return false
+        seen[id] = true
+    return true
+
+func _integer_array(value: Array) -> Array:
+    var result: Array = []
+    for entry in value:
+        result.append(int(entry))
+    return result
+
 func _valid_batch_job(facility: String, job: Dictionary) -> bool:
     if not _has_exact_keys(job, ["recipe", "quantity", "remaining", "duration"]):
         return false
@@ -262,6 +834,8 @@ func _valid_drill_job(job: Dictionary, restored_depth: int, restored_drill_level
     if int(job["target_depth"]) != restored_depth + 10 or not _valid_job_times(job):
         return false
     var required_level := mini(Catalog.MAX_DRILL_LEVEL, 1 + floori(float(restored_depth + 10) / 30.0))
+    if Catalog.MILESTONES.has(restored_depth + 10):
+        required_level = maxi(required_level, int(Catalog.MILESTONES[restored_depth + 10].get("requires_drill", 1)))
     if restored_drill_level < required_level:
         return false
     for committed_level in range(required_level, restored_drill_level + 1):

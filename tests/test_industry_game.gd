@@ -24,6 +24,7 @@ func test_initial_stock_and_automatic_extraction(t: TestSupport) -> void:
         "iron_ingot": 0.0,
         "copper_ingot": 0.0,
         "cable": 0.0,
+        "crystal": 0.0,
     }, "stocks initiaux complets")
 
     var report: Dictionary = game.advance(10.0)
