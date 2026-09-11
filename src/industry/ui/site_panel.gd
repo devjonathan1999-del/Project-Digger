@@ -11,6 +11,8 @@ var _title: Label
 var _body: Label
 var _primary: Button
 var _secondary: Button
+var _event_choices: HBoxContainer
+var _event_buttons: Dictionary = {}
 var _built := false
 
 func _ready() -> void:
@@ -29,11 +31,21 @@ func show_selection(kind: String, id: String, session) -> void:
     visible = true
     refresh()
 
+func show_event(session) -> void:
+    _session = session
+    _kind = "event"
+    _id = "unstable_vein"
+    _ensure_built()
+    visible = true
+    refresh()
+
 func clear_selection() -> void:
     _kind = ""
     _id = ""
     _disconnect_button(_primary)
     _disconnect_button(_secondary)
+    if _event_choices != null:
+        _event_choices.visible = false
     visible = false
 
 func refresh() -> void:
@@ -105,10 +117,24 @@ func refresh() -> void:
             var target_state := not active
             var site_reason: String = str(game.site_toggle_block_reason(_id, target_state))
             _configure_action(_primary, "DÉSACTIVER" if active else "ACTIVER", site_reason, Callable(_session, "set_site_active").bind(_id, target_state))
+        "event":
+            if game.active_event.is_empty():
+                clear_selection()
+                return
+            var resource_id := str(game.active_event.get("resource", ""))
+            _title.text = "Filon instable"
+            if resource_id == "":
+                _body.text = "Choisis la ressource à privilégier.\nLe compte à rebours démarre seulement après ton choix."
+                _event_choices.visible = true
+            else:
+                var resource_label := str(Catalog.RESOURCES[resource_id]["label"])
+                _body.text = "Priorité : %s\nBonus d'extraction actif\nTemps restant : %s" % [resource_label, _duration(float(game.active_event.get("remaining", 0.0)))]
         _:
             clear_selection()
 
 func _reset_actions() -> void:
+    if _event_choices != null:
+        _event_choices.visible = false
     for button in [_primary, _secondary]:
         _disconnect_button(button)
         button.visible = false
@@ -131,6 +157,10 @@ func _disconnect_button(button: Button) -> void:
         if button.pressed.is_connected(callable):
             button.pressed.disconnect(callable)
 
+func _choose_event_resource(resource_id: String) -> void:
+    if _session != null:
+        _session.choose_event_resource(resource_id)
+
 func _ensure_built() -> void:
     if _built:
         return
@@ -149,6 +179,22 @@ func _ensure_built() -> void:
     header.add_child(close)
     _body = _label(content, "", 14, Style.TEXT)
     _body.custom_minimum_size.y = 88
+
+    _event_choices = HBoxContainer.new()
+    _event_choices.name = "EventChoices"
+    _event_choices.visible = false
+    _event_choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    content.add_child(_event_choices)
+    for resource_id in ["iron", "copper", "coal"]:
+        var choice := Button.new()
+        choice.name = "Event_" + resource_id
+        choice.text = Catalog.RESOURCES[resource_id]["label"]
+        choice.custom_minimum_size.y = 40
+        choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        choice.pressed.connect(_choose_event_resource.bind(resource_id))
+        _event_choices.add_child(choice)
+        _event_buttons[resource_id] = choice
+
     _primary = Button.new()
     _primary.name = "ContextPrimary"
     _primary.text = "Action"
