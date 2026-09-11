@@ -6,6 +6,7 @@ on:
       - feature/digger-v0.1
       - feature/progression-v0.3
       - feature/visual-v0.4
+      - feature/visual-depth-v0.5
       - main
   pull_request:
     branches:
