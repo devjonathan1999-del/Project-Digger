@@ -37,7 +37,7 @@ func _run() -> void:
     t.equal(session.game.active_event.get("resource", "missing"), "", "aucune ressource choisie à la présentation")
     var initial_remaining := float(session.game.active_event.get("remaining", -1.0))
     session.advance_to(session.last_seen_unix + 60.0)
-    t.approx(float(session.game.active_event.get("remaining", -1.0)), initial_remaining, 0.001, "timer suspendu tant que le choix n'est pas fait")
+    t.check(absf(float(session.game.active_event.get("remaining", -1.0)) - initial_remaining) <= 0.001, "timer suspendu tant que le choix n'est pas fait")
 
     for resource_id in ["iron", "copper", "coal"]:
         var choice = screen.find_child("Event_" + resource_id, true, false)
@@ -47,7 +47,7 @@ func _run() -> void:
         await _click(iron_choice)
     t.equal(session.game.active_event.get("resource", ""), "iron", "choix Fer appliqué via la session")
     session.advance_to(session.last_seen_unix + 60.0)
-    t.approx(float(session.game.active_event.get("remaining", -1.0)), initial_remaining - 60.0, 0.001, "timer démarre après le choix")
+    t.check(absf(float(session.game.active_event.get("remaining", -1.0)) - (initial_remaining - 60.0)) <= 0.001, "timer démarre après le choix")
 
     session.offline_seconds = 125.0
     session.offline_report = {
