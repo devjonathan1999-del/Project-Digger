@@ -39,17 +39,7 @@ func marker_is_emphasized(key: String) -> bool:
 func _process(_delta: float) -> void:
     if _world == null or not is_instance_valid(_world):
         return
-    if _selected_key != "" and not _context_panel_visible():
-        _selected_key = ""
     _sync()
-
-func _context_panel_visible() -> bool:
-    if not is_inside_tree():
-        return true
-    var context = get_tree().root.find_child("ContextPanel", true, false)
-    if context == null:
-        return true
-    return bool(context.visible)
 
 func _sync() -> void:
     if _world == null or not is_instance_valid(_world):
