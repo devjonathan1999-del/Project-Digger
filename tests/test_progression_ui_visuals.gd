@@ -5,6 +5,7 @@ const PATH := "user://tests/progression_ui_visuals.json"
 
 var t = Support.new()
 
+# Task 12 verrouille des états visuels, jamais des récompenses économiques.
 func _initialize() -> void:
     call_deferred("_run")
 
