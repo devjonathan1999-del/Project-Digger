@@ -80,7 +80,7 @@ func run(t: TestSupport) -> void:
     t.equal(game.center_level, 5, "Centre niveau 5 confirmé")
     t.check(game.discoveries.has("120:0"), "structure ancienne garantie détectée")
     t.equal(game.discoveries["120:0"]["type"], "ancient_structure", "palier 120 m donne la structure ancienne")
-    var tech_before_structure := game.tech_points
+    var tech_before_structure: int = int(game.tech_points)
     t.check(game.start_exploration("120:0"), "structure ancienne explorée")
     _complete_exploration(game, "120:0")
     t.check(game.tech_points > tech_before_structure, "structure ancienne accorde un point technologique")
