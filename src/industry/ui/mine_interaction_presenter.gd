@@ -46,9 +46,13 @@ func _sync() -> void:
         _labels.erase(key)
 
 func _style_target(target: Button) -> void:
+    if not target.has_meta("presenter_original_text"):
+        target.set_meta("presenter_original_text", target.text)
+    var original_text := str(target.get_meta("presenter_original_text", ""))
+    target.tooltip_text = original_text
+    target.text = ""
     target.modulate = Color(1.0, 1.0, 1.0, 0.04)
     target.focus_mode = Control.FOCUS_NONE
-    target.tooltip_text = target.text
 
 func _sync_label(key: String, text: String, target: Button) -> void:
     var label: Label
@@ -93,6 +97,7 @@ func _key_for_target(node_name: StringName) -> String:
 
 func _label_for_target(target: Button) -> String:
     var key := _key_for_target(target.name)
+    var original_text := str(target.get_meta("presenter_original_text", target.text))
     match key:
         "iron":
             return "Fer"
@@ -105,7 +110,7 @@ func _label_for_target(target: Button) -> String:
     if key.begins_with("Site_"):
         return "Site d'exploitation"
     if key.begins_with("Discovery_"):
-        var raw := target.text.to_lower()
+        var raw := original_text.to_lower()
         if "anomal" in raw:
             return "Anomalie"
         if "structure" in raw:
@@ -113,4 +118,4 @@ func _label_for_target(target: Button) -> String:
         if "cristal" in raw:
             return "Cristaux"
         return "Signal minéral"
-    return target.text
+    return original_text
