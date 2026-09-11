@@ -291,20 +291,20 @@ func _draw_depth_atmosphere() -> void:
     var strength := accent_strength_for_depth(depth)
     var alpha := 0.05 + strength * 0.07
     draw_rect(Rect2(0, 0, size.x, size.y), Color(0.08, 0.38, 0.40, alpha), false, 2.0)
-    if depth >= 90:
-        var crystal_depths := [98.0, 112.0, 132.0, 154.0]
-        var ratios := [0.15, 0.84, 0.28, 0.72]
-        for i in range(crystal_depths.size()):
-            var y := _depth_to_y(crystal_depths[i])
-            if y < -30 or y > size.y + 30:
-                continue
-            var x := size.x * ratios[i]
-            _draw_crystal_cluster(Vector2(x, y), strength)
+    var crystal_depths: Array[float] = [98.0, 112.0, 132.0, 154.0]
+    var ratios: Array[float] = [0.15, 0.84, 0.28, 0.72]
+    for i in range(crystal_depths.size()):
+        var y: float = _depth_to_y(crystal_depths[i])
+        if y < -30.0 or y > size.y + 30.0:
+            continue
+        var x: float = size.x * ratios[i]
+        _draw_crystal_cluster(Vector2(x, y), strength)
 
 func _draw_crystal_cluster(center: Vector2, strength: float) -> void:
     var glow := Color(0.25, 0.91, 0.86, 0.18 + strength * 0.28)
     draw_circle(center, 17 + 10 * strength, glow)
-    for offset in [-10.0, 0.0, 11.0]:
+    var offsets: Array[float] = [-10.0, 0.0, 11.0]
+    for offset in offsets:
         var h := 13.0 + absf(offset) * 0.5
         var points := PackedVector2Array([
             center + Vector2(offset - 5, 5),
