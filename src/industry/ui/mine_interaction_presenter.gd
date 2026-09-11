@@ -3,8 +3,12 @@ extends Control
 
 const Style = preload("res://src/industry/ui/industry_theme.gd")
 
+const REST_ALPHA := 0.34
+const EMPHASIZED_ALPHA := 1.0
+
 var _world: Control
 var _labels: Dictionary = {}
+var _selected_key := ""
 
 func _ready() -> void:
     name = "MineInteractionPresenter"
@@ -14,7 +18,23 @@ func _ready() -> void:
 
 func bind(world: Control) -> void:
     _world = world
+    if _world != null and _world.has_signal("selection_changed") and not _world.selection_changed.is_connected(_on_world_selection):
+        _world.selection_changed.connect(_on_world_selection)
     _sync()
+
+func set_selected_key(key: String) -> void:
+    _selected_key = key
+    _sync()
+
+func marker_alpha(key: String) -> float:
+    if not _labels.has(key) or not is_instance_valid(_labels[key]):
+        return -1.0
+    return float((_labels[key] as CanvasItem).modulate.a)
+
+func marker_is_emphasized(key: String) -> bool:
+    if not _labels.has(key) or not is_instance_valid(_labels[key]):
+        return false
+    return bool((_labels[key] as Control).get_meta("emphasized", false))
 
 func _process(_delta: float) -> void:
     if _world == null or not is_instance_valid(_world):
@@ -22,6 +42,8 @@ func _process(_delta: float) -> void:
     _sync()
 
 func _sync() -> void:
+    if _world == null or not is_instance_valid(_world):
+        return
     move_to_front()
     var seen: Dictionary = {}
     for node in _world.get_children():
@@ -51,8 +73,8 @@ func _style_target(target: Button) -> void:
     var original_text := str(target.get_meta("presenter_original_text", ""))
     target.tooltip_text = original_text
     target.text = ""
-    target.modulate = Color(1.0, 1.0, 1.0, 0.04)
-    target.focus_mode = Control.FOCUS_NONE
+    target.modulate = Color(1.0, 1.0, 1.0, 0.035)
+    target.focus_mode = Control.FOCUS_ALL
 
 func _sync_label(key: String, text: String, target: Button) -> void:
     var label: Label
@@ -64,24 +86,48 @@ func _sync_label(key: String, text: String, target: Button) -> void:
         label.mouse_filter = Control.MOUSE_FILTER_IGNORE
         label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-        label.add_theme_font_size_override("font_size", 11)
-        label.add_theme_color_override("font_color", Style.TEXT)
-        label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
+        label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.88))
         label.add_theme_constant_override("shadow_offset_x", 1)
         label.add_theme_constant_override("shadow_offset_y", 1)
         add_child(label)
         _labels[key] = label
 
-    label.text = text
+    var emphasized := key == _selected_key or target.has_focus() or target.is_hovered()
+    label.set_meta("emphasized", emphasized)
+    label.text = text if emphasized else "· " + text
     label.visible = target.visible
-    label.size = Vector2(maxf(92.0, target.size.x), 20.0)
+    label.size = Vector2(maxf(78.0, target.size.x), 20.0)
     label.position = Vector2(target.position.x + target.size.x * 0.5 - label.size.x * 0.5, target.position.y - 20.0)
+    label.add_theme_font_size_override("font_size", 12 if emphasized else 10)
+    label.modulate = Color(1.0, 1.0, 1.0, EMPHASIZED_ALPHA if emphasized else REST_ALPHA)
+    label.add_theme_color_override("font_color", _color_for_key(key, emphasized))
+
+func _color_for_key(key: String, emphasized: bool) -> Color:
+    var color := Style.MUTED
     if key == "Drill":
-        label.add_theme_color_override("font_color", Style.COPPER)
+        color = Style.COPPER
     elif key.begins_with("Discovery_"):
-        label.add_theme_color_override("font_color", Style.ACCENT)
+        color = Style.ACCENT
     elif key.begins_with("Site_"):
-        label.add_theme_color_override("font_color", Style.CRYSTAL_CYAN)
+        color = Style.CRYSTAL_CYAN
+    elif emphasized:
+        color = Style.TEXT
+    if emphasized:
+        return color.lightened(0.10)
+    return color
+
+func _on_world_selection(kind: String, id: String) -> void:
+    match kind:
+        "mine":
+            set_selected_key(id)
+        "drill":
+            set_selected_key("Drill")
+        "discovery":
+            set_selected_key("Discovery_" + id.replace(":", "_"))
+        "site":
+            set_selected_key("Site_" + id.replace(":", "_"))
+        _:
+            set_selected_key("")
 
 func _key_for_target(node_name: StringName) -> String:
     var value := str(node_name)
