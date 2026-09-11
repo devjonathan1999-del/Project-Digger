@@ -72,7 +72,7 @@ func _run() -> void:
     t.check(offline_close != null, "fermeture manuelle du bilan disponible")
     if offline_close != null:
         await _click(offline_close)
-    t.check(not offline_card.visible, "bilan hors ligne fermable sans bloquer le jeu")
+    t.check(offline_card != null and not offline_card.visible, "bilan hors ligne fermable sans bloquer le jeu")
 
     screen.queue_free()
     await process_frame
