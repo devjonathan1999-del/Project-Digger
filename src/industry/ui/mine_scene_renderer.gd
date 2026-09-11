@@ -2,13 +2,19 @@ class_name MineSceneRenderer
 extends Control
 
 const Style = preload("res://src/industry/ui/industry_theme.gd")
+const Layout = preload("res://src/industry/ui/mine_visual_layout.gd")
 
 const PIXELS_PER_METER := 7.0
 const SURFACE_Y := 72.0
+const GALLERY_HORIZONS := [12, 30, 60, 90, 120, 150]
 
 var surface_module_count := 0
 var gallery_detail_count := 0
 var deep_accent_strength := 0.0
+var gallery_variants_seen: Dictionary = {}
+var gallery_silhouette_count := 0
+var broken_rail_count := 0
+var alcove_count := 0
 
 var _session
 var _world: Control
@@ -32,6 +38,7 @@ func set_scene_state(state: Dictionary) -> void:
     surface_module_count = 4 + maxi(0, mini(center_level - 3, 3))
     gallery_detail_count = 5 if depth >= 30 else 3
     deep_accent_strength = accent_strength_for_depth(depth)
+    _update_gallery_metrics(depth, center_level)
     queue_redraw()
 
 func accent_strength_for_depth(depth: int) -> float:
@@ -66,6 +73,24 @@ func _sync_state() -> void:
         "animation_phase": float(_world.get("animation_phase")),
         "viewport_size": size,
     })
+
+func _update_gallery_metrics(depth: int, center_level: int) -> void:
+    gallery_variants_seen.clear()
+    gallery_silhouette_count = 0
+    broken_rail_count = 0
+    alcove_count = 0
+    for horizon in GALLERY_HORIZONS:
+        if horizon > depth + 15:
+            continue
+        for side in [0, 1]:
+            var profile: Dictionary = Layout.gallery_profile(horizon, side, depth, center_level)
+            var variant := str(profile["variant"])
+            gallery_variants_seen[variant] = true
+            gallery_silhouette_count += 1
+            if float(profile["rail_break_start"]) >= 0.0:
+                broken_rail_count += 1
+            if int(profile["alcove_side"]) >= 0:
+                alcove_count += 1
 
 func _draw() -> void:
     if _state.is_empty():
@@ -193,8 +218,7 @@ func _draw_shaft() -> void:
 
 func _draw_galleries() -> void:
     var current_depth := int(_state.get("depth", 0))
-    var horizons := [12, 30, 60, 90, 120, 150]
-    for depth_value in horizons:
+    for depth_value in GALLERY_HORIZONS:
         if depth_value > current_depth + 15:
             continue
         var y := _depth_to_y(float(depth_value))
@@ -208,29 +232,113 @@ func _draw_gallery(depth_value: float, y: float) -> void:
     var left_end := size.x * 0.45
     var right_start := size.x * 0.55
     var right_end := size.x * 0.92
-    var cavity := Color("11191f")
-    draw_rect(Rect2(left_start, y - 24, left_end - left_start, 48), cavity)
-    draw_rect(Rect2(right_start, y - 24, right_end - right_start, 48), cavity)
-    _draw_gallery_side(left_start, left_end, y, false, accent)
-    _draw_gallery_side(right_start, right_end, y, true, accent)
+    var total_depth := int(_state.get("depth", 0))
+    var center_level := int(_state.get("center_level", 1))
+    var left_profile: Dictionary = Layout.gallery_profile(int(depth_value), 0, total_depth, center_level)
+    var right_profile: Dictionary = Layout.gallery_profile(int(depth_value), 1, total_depth, center_level)
+    _draw_gallery_side_profile(left_start, left_end, y, false, accent, left_profile)
+    _draw_gallery_side_profile(right_start, right_end, y, true, accent, right_profile)
 
-func _draw_gallery_side(start_x: float, end_x: float, y: float, mirrored: bool, accent: float) -> void:
+func _draw_gallery_side_profile(start_x: float, end_x: float, y: float, mirrored: bool, accent: float, profile: Dictionary) -> void:
+    var base_length := end_x - start_x
+    var width_scale := clampf(float(profile["width_scale"]), 0.45, 1.0)
+    var effective_start := start_x
+    var effective_end := end_x
+    if mirrored:
+        effective_end = start_x + base_length * width_scale
+    else:
+        effective_start = end_x - base_length * width_scale
+
+    var gallery_height := clampf(float(profile["height"]), 34.0, 76.0)
+    var cavity_top := y - gallery_height * 0.5
+    var cavity := Color("11191f")
+    draw_rect(Rect2(effective_start, cavity_top, effective_end - effective_start, gallery_height), cavity)
+
+    var variant := str(profile["variant"])
+    if variant == "alcove":
+        _draw_alcove(effective_start, effective_end, y, mirrored, gallery_height)
+    elif variant == "collapsed":
+        _draw_collapse(effective_start, effective_end, y, mirrored)
+    elif variant == "dead_end":
+        _draw_dead_end(effective_start, effective_end, y, mirrored, gallery_height)
+    elif variant == "wide":
+        _draw_storage(effective_start, effective_end, y, mirrored)
+
     var steel := Color("68767c")
     var amber := Color("d49a54")
     var cyan := Color(0.25, 0.86, 0.82, accent)
-    draw_line(Vector2(start_x, y + 14), Vector2(end_x, y + 14), steel, 3.0)
-    draw_line(Vector2(start_x, y + 19), Vector2(end_x, y + 19), Color("37434a"), 2.0)
-    for x in range(int(start_x) + 18, int(end_x), 58):
-        draw_line(Vector2(x, y - 20), Vector2(x, y + 22), steel, 2.0)
-        draw_line(Vector2(x - 8, y - 20), Vector2(x + 8, y - 20), steel, 2.0)
-        draw_circle(Vector2(x, y - 13), 3.0, amber)
-    var pipe_y := y - 8.0
-    draw_line(Vector2(start_x + 10, pipe_y), Vector2(end_x - 10, pipe_y), Color("9a613a"), 3.0)
+    var support_spacing := maxi(40, int(profile["support_spacing"]))
+    var lamp_stride := maxi(1, int(profile["lamp_stride"]))
+    var support_index := 0
+    for support_x in range(int(effective_start) + 18, int(effective_end), support_spacing):
+        var roof_y := cavity_top + 4.0
+        draw_line(Vector2(support_x, roof_y), Vector2(support_x, y + gallery_height * 0.42), steel, 2.0)
+        draw_line(Vector2(support_x - 8, roof_y), Vector2(support_x + 8, roof_y), steel, 2.0)
+        if support_index % lamp_stride == 0:
+            draw_circle(Vector2(support_x, roof_y + 7.0), 3.0, amber)
+        support_index += 1
+
+    _draw_profile_rails(effective_start, effective_end, y, profile)
+
+    var pipe_count := maxi(0, int(profile["pipe_count"]))
+    for pipe_index in range(pipe_count):
+        var pipe_y := y - 8.0 - pipe_index * 6.0
+        draw_line(Vector2(effective_start + 10, pipe_y), Vector2(effective_end - 10, pipe_y), Color("9a613a"), 3.0)
     if accent > 0.15:
-        draw_line(Vector2(start_x + 18, y + 6), Vector2(end_x - 18, y + 6), cyan, 1.5)
-    var machine_x := end_x - 46.0 if not mirrored else start_x + 16.0
-    draw_rect(Rect2(machine_x, y - 4, 32, 18), Color("3d4a51"))
-    draw_rect(Rect2(machine_x + 5, y + 1, 9, 5), amber)
+        draw_line(Vector2(effective_start + 18, y + 6), Vector2(effective_end - 18, y + 6), cyan, 1.5)
+
+    var machine_count := maxi(0, int(profile["machine_count"]))
+    for machine_index in range(machine_count):
+        var offset := float(machine_index) * 38.0
+        var machine_x := effective_end - 46.0 - offset if not mirrored else effective_start + 16.0 + offset
+        if machine_x < effective_start + 4.0 or machine_x + 32.0 > effective_end - 4.0:
+            continue
+        draw_rect(Rect2(machine_x, y - 4, 32, 18), Color("3d4a51"))
+        draw_rect(Rect2(machine_x + 5, y + 1, 9, 5), amber)
+
+func _draw_profile_rails(start_x: float, end_x: float, y: float, profile: Dictionary) -> void:
+    var steel := Color("68767c")
+    var dark := Color("37434a")
+    var break_start := float(profile["rail_break_start"])
+    var break_end := float(profile["rail_break_end"])
+    if break_start < 0.0 or break_end <= break_start:
+        draw_line(Vector2(start_x, y + 14), Vector2(end_x, y + 14), steel, 3.0)
+        draw_line(Vector2(start_x, y + 19), Vector2(end_x, y + 19), dark, 2.0)
+        return
+
+    var gap_start := lerpf(start_x, end_x, clampf(break_start, 0.0, 1.0))
+    var gap_end := lerpf(start_x, end_x, clampf(break_end, 0.0, 1.0))
+    for rail_y in [y + 14.0, y + 19.0]:
+        var color := steel if rail_y < y + 18.0 else dark
+        var line_width := 3.0 if rail_y < y + 18.0 else 2.0
+        draw_line(Vector2(start_x, rail_y), Vector2(gap_start, rail_y), color, line_width)
+        draw_line(Vector2(gap_end, rail_y), Vector2(end_x, rail_y), color, line_width)
+
+func _draw_collapse(start_x: float, end_x: float, y: float, mirrored: bool) -> void:
+    var center_x := lerpf(start_x, end_x, 0.58 if not mirrored else 0.42)
+    var rock := Color("4a4745")
+    draw_circle(Vector2(center_x - 11, y + 8), 11.0, rock)
+    draw_circle(Vector2(center_x + 2, y + 6), 14.0, Color("55504c"))
+    draw_circle(Vector2(center_x + 15, y + 11), 9.0, Color("423f3d"))
+
+func _draw_alcove(start_x: float, end_x: float, y: float, mirrored: bool, gallery_height: float) -> void:
+    var width := minf(64.0, (end_x - start_x) * 0.30)
+    var alcove_x := end_x - width if not mirrored else start_x
+    draw_rect(Rect2(alcove_x, y - gallery_height * 0.72, width, gallery_height * 0.28), Color("0b141a"))
+    draw_line(Vector2(alcove_x + 6, y - gallery_height * 0.45), Vector2(alcove_x + width - 6, y - gallery_height * 0.45), Color("596970"), 2.0)
+
+func _draw_dead_end(start_x: float, end_x: float, y: float, mirrored: bool, gallery_height: float) -> void:
+    var face_x := end_x - 5.0 if mirrored else start_x + 5.0
+    var rock := Color("4b4946")
+    draw_line(Vector2(face_x, y - gallery_height * 0.42), Vector2(face_x, y + gallery_height * 0.42), rock, 8.0)
+    draw_circle(Vector2(face_x + (-6.0 if mirrored else 6.0), y + 10), 9.0, Color("55514d"))
+
+func _draw_storage(start_x: float, end_x: float, y: float, mirrored: bool) -> void:
+    var x := end_x - 86.0 if not mirrored else start_x + 48.0
+    if x < start_x + 4.0 or x + 34.0 > end_x - 4.0:
+        return
+    draw_rect(Rect2(x, y - 25, 34, 16), Color("48545a"))
+    draw_rect(Rect2(x + 5, y - 20, 24, 3), Color("b97842"))
 
 func _draw_sites_and_discoveries() -> void:
     var discoveries: Dictionary = _state.get("discoveries", {})
