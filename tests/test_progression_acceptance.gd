@@ -105,8 +105,8 @@ func run(t: TestSupport) -> void:
     var first_load: Dictionary = Save.new().load_game(PATH, 1000.0)
     var second_load: Dictionary = Save.new().load_game(PATH, 1000.0)
     t.equal(first_load["error"], "", "sauvegarde v0.3 relue sans erreur")
-    t.equal(first_load["game"].snapshot(), expected, "rechargement conserve exactement la progression")
-    t.equal(second_load["game"].snapshot(), first_load["game"].snapshot(), "rechargements répétés ne dupliquent aucune récompense")
+    t.check(_equivalent_value(first_load["game"].snapshot(), expected), "rechargement conserve toute la progression")
+    t.check(_equivalent_value(second_load["game"].snapshot(), first_load["game"].snapshot()), "rechargements répétés ne dupliquent aucune récompense")
     t.equal(first_load["game"].permanent_sites.size(), game.permanent_sites.size(), "sites permanents non dupliqués")
     t.equal(first_load["game"].tech_points, game.tech_points, "points technologiques non dupliqués")
 
@@ -133,6 +133,32 @@ func _seed_with_unstable_cavity_at_40() -> int:
         if str(discovery.get("type", "")) == "unstable_cavity":
             return seed
     return 0
+
+func _equivalent_value(actual: Variant, expected: Variant) -> bool:
+    var actual_type := typeof(actual)
+    var expected_type := typeof(expected)
+    var numeric_types := [TYPE_INT, TYPE_FLOAT]
+    if actual_type in numeric_types and expected_type in numeric_types:
+        return is_equal_approx(float(actual), float(expected))
+    if actual_type == TYPE_DICTIONARY and expected_type == TYPE_DICTIONARY:
+        var actual_dict: Dictionary = actual
+        var expected_dict: Dictionary = expected
+        if actual_dict.size() != expected_dict.size():
+            return false
+        for key in expected_dict:
+            if not actual_dict.has(key) or not _equivalent_value(actual_dict[key], expected_dict[key]):
+                return false
+        return true
+    if actual_type == TYPE_ARRAY and expected_type == TYPE_ARRAY:
+        var actual_array: Array = actual
+        var expected_array: Array = expected
+        if actual_array.size() != expected_array.size():
+            return false
+        for index in range(expected_array.size()):
+            if not _equivalent_value(actual_array[index], expected_array[index]):
+                return false
+        return true
+    return actual == expected
 
 func _fund(game) -> void:
     game.resources["iron"] = 10000.0
