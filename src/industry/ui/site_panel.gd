@@ -17,7 +17,7 @@ var _built := false
 
 func _ready() -> void:
     name = "ContextPanel"
-    mouse_filter = Control.MOUSE_FILTER_STOP
+    mouse_filter = Control.MOUSE_FILTER_IGNORE
     add_theme_stylebox_override("panel", Style.panel(Color("101b25e8"), Style.COPPER, 12))
     _ensure_built()
     set_layout_mode("floating_right")
@@ -106,7 +106,6 @@ func refresh() -> void:
             elif excavation_reason != "":
                 _body.text += "\n" + excavation_reason
             _configure_action(_primary, "FORER", excavation_reason, Callable(_session, "start_excavation"))
-
             var upgrade_reason := ""
             if int(game.drill_level) >= Catalog.MAX_DRILL_LEVEL:
                 upgrade_reason = "Niveau maximum"
@@ -191,9 +190,11 @@ func _ensure_built() -> void:
         return
     _built = true
     var content := VBoxContainer.new()
+    content.mouse_filter = Control.MOUSE_FILTER_IGNORE
     content.add_theme_constant_override("separation", 8)
     add_child(content)
     var header := HBoxContainer.new()
+    header.mouse_filter = Control.MOUSE_FILTER_IGNORE
     content.add_child(header)
     _title = _label(header, "SÉLECTION", 17, Style.ACCENT)
     var close := Button.new()
@@ -204,9 +205,9 @@ func _ensure_built() -> void:
     header.add_child(close)
     _body = _label(content, "", 13, Style.TEXT)
     _body.custom_minimum_size.y = 60
-
     _event_choices = HBoxContainer.new()
     _event_choices.name = "EventChoices"
+    _event_choices.mouse_filter = Control.MOUSE_FILTER_IGNORE
     _event_choices.visible = false
     _event_choices.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     content.add_child(_event_choices)
@@ -219,7 +220,6 @@ func _ensure_built() -> void:
         choice.pressed.connect(_choose_event_resource.bind(resource_id))
         _event_choices.add_child(choice)
         _event_buttons[resource_id] = choice
-
     _primary = Button.new()
     _primary.name = "ContextPrimary"
     _primary.text = "Action"
@@ -248,6 +248,7 @@ func _duration(seconds: float) -> String:
 
 func _label(parent: Node, value: String, font_size: int = 16, color: Color = Style.TEXT) -> Label:
     var label := Label.new()
+    label.mouse_filter = Control.MOUSE_FILTER_IGNORE
     label.text = value
     label.add_theme_font_size_override("font_size", font_size)
     label.add_theme_color_override("font_color", color)
