@@ -28,7 +28,12 @@ var _drill_upgrade: Button
 var _dig: Button
 var _dig_info: Label
 var _dig_progress: ProgressBar
+var _event_banner: PanelContainer
+var _event_label: Label
+var _event_view: Button
+var _offline_card: PanelContainer
 var _offline: Label
+var _offline_dismissed := false
 var _save_notice: Label
 var _save_status: Label
 var _tabs: Dictionary = {}
@@ -86,8 +91,9 @@ func _build() -> void:
         number.name = "Stock_" + id
         _wallet[id] = number
 
-    _offline = _label(shell, "", 14, Style.ACCENT)
-    _offline.name = "OfflineNotice"
+    _build_event_banner(shell)
+    _build_offline_card(shell)
+
     _save_notice = _label(shell, "", 14, Style.COPPER)
     _save_notice.name = "SaveNotice"
 
@@ -128,6 +134,37 @@ func _build() -> void:
     _add_tab(nav, "Industrie", "TabIndustrie", "industry")
     _add_tab(nav, "Centre", "TabCentre", "center")
     _add_tab(nav, "Technologie", "TabTechnologie", "technology")
+
+func _build_event_banner(parent: Node) -> void:
+    _event_banner = PanelContainer.new()
+    _event_banner.name = "PendingEventBanner"
+    _event_banner.visible = false
+    _event_banner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _event_banner.add_theme_stylebox_override("panel", Style.panel(Color("1d2b32"), Style.COPPER, 10))
+    parent.add_child(_event_banner)
+    var row := HBoxContainer.new()
+    row.add_theme_constant_override("separation", 10)
+    _event_banner.add_child(row)
+    _event_label = _label(row, "", 14, Style.COPPER)
+    _event_view = _button(row, "VOIR", "PendingEventView")
+    _event_view.custom_minimum_size.x = 100
+    _event_view.pressed.connect(_open_event)
+
+func _build_offline_card(parent: Node) -> void:
+    _offline_card = PanelContainer.new()
+    _offline_card.name = "OfflineCard"
+    _offline_card.visible = false
+    _offline_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _offline_card.add_theme_stylebox_override("panel", Style.panel(Color("102c30"), Style.ACCENT, 10))
+    parent.add_child(_offline_card)
+    var row := HBoxContainer.new()
+    row.add_theme_constant_override("separation", 10)
+    _offline_card.add_child(row)
+    _offline = _label(row, "", 14, Style.ACCENT)
+    _offline.name = "OfflineNotice"
+    var close := _button(row, "×", "OfflineClose")
+    close.custom_minimum_size = Vector2(40, 40)
+    close.pressed.connect(_dismiss_offline)
 
 func _build_mine_panel() -> void:
     _mine_panel = VBoxContainer.new()
@@ -241,10 +278,42 @@ func _refresh() -> void:
     _industry_panel.refresh()
     _center_panel.refresh()
     _technology_panel.refresh()
+    _refresh_event_banner()
+    _refresh_offline_card()
 
 func _refresh_milestone_buttons() -> void:
     for milestone in _milestone_buttons:
         _milestone_buttons[milestone].visible = session.game.depth >= int(milestone)
+
+func _refresh_event_banner() -> void:
+    if _event_banner == null:
+        return
+    var game = session.game
+    if not game.active_event.is_empty():
+        _event_banner.visible = true
+        var resource_id := str(game.active_event.get("resource", ""))
+        if resource_id == "":
+            _event_label.text = "Filon instable détecté — choisir une priorité d'exploitation"
+            _event_view.text = "CHOISIR"
+        else:
+            var label := str(Catalog.RESOURCES[resource_id]["label"])
+            _event_label.text = "Filon instable · %s · %s restantes" % [label, _duration(float(game.active_event.get("remaining", 0.0)))]
+            _event_view.text = "DÉTAILS"
+        return
+    if not game.pending_events.is_empty():
+        _event_banner.visible = true
+        _event_label.text = "Filon instable détecté — choisir une priorité d'exploitation"
+        _event_view.text = "VOIR"
+        return
+    _event_banner.visible = false
+
+func _open_event() -> void:
+    if session.game.active_event.is_empty():
+        if not session.present_pending_event():
+            return
+    _select_view("mine")
+    _site_panel.show_event(session)
+    _refresh_event_banner()
 
 func _on_world_selection(kind: String, id: String) -> void:
     _site_panel.show_selection(kind, id, session)
@@ -254,6 +323,13 @@ func _focus_depth(target_depth: int) -> void:
 
 func _focus_drill() -> void:
     _mine_world.focus_depth(session.game.depth)
+
+func _dismiss_offline() -> void:
+    _offline_dismissed = true
+    if _offline_card != null:
+        _offline_card.visible = false
+    if _offline != null:
+        _offline.visible = false
 
 func _refresh_notices() -> void:
     _save_notice.visible = session.save_blocked or session.save_error != ""
@@ -266,11 +342,27 @@ func _refresh_notices() -> void:
     else:
         _save_notice.text = ""
         _save_status.text = "Progression enregistrée automatiquement · Les mines restent actives pendant ton absence."
-    _offline.visible = session.offline_seconds >= 5.0
-    if _offline.visible:
-        var report: Dictionary = session.offline_report
-        var completed: Array = report.get("completed", [])
-        _offline.text = "Bon retour · %s d'absence\nRécolté : %s · %d travaux terminés · +%d m" % [_duration(session.offline_seconds), _cost(report.get("produced", {})), completed.size(), report.get("depth_gained", 0)]
+    _refresh_offline_card()
+
+func _refresh_offline_card() -> void:
+    if _offline_card == null or _offline == null:
+        return
+    var should_show := session.offline_seconds >= 5.0 and not _offline_dismissed
+    _offline_card.visible = should_show
+    _offline.visible = should_show
+    if not should_show:
+        return
+    var report: Dictionary = session.offline_report
+    var completed: Array = report.get("completed", [])
+    var pending_count := session.game.pending_events.size()
+    var event_text := "%d événement%s en attente" % [pending_count, "s" if pending_count != 1 else ""]
+    _offline.text = "Bon retour · %s d'absence\nRécolté : %s · %d travaux terminés · +%d m · %s" % [
+        _duration(session.offline_seconds),
+        _cost(report.get("produced", {})),
+        completed.size(),
+        report.get("depth_gained", 0),
+        event_text,
+    ]
 
 func _responsive() -> void:
     if _wallet_grid == null:
