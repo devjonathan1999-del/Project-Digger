@@ -265,7 +265,6 @@ func _decor_rect(node_name: String, color: Color, dimensions: Vector2) -> ColorR
 func _sync_decor_state() -> void:
     if _decor_root == null:
         return
-    _decor_root.size = size
     if session == null:
         _drill_activity.visible = false
         return
@@ -307,10 +306,7 @@ func _sync_crystal_activity() -> void:
         _crystal_activity.erase(id)
 
 func _update_decor_positions() -> void:
-    if _decor_root == null:
-        return
-    _decor_root.size = size
-    if session == null:
+    if _decor_root == null or session == null:
         return
 
     var shaft_x := size.x * 0.5
@@ -353,10 +349,7 @@ func _update_decor_positions() -> void:
         marker.visible = _rect_near_view(marker.position, marker.size)
 
     _drill_activity.position = Vector2(shaft_x - 8.0, _depth_to_y(float(session.game.depth) + 7.0) + 18.0)
-    if session.game.jobs.has("drill"):
-        _drill_activity.visible = _rect_near_view(_drill_activity.position, _drill_activity.size)
-    else:
-        _drill_activity.visible = false
+    _drill_activity.visible = session.game.jobs.has("drill")
 
     for site_id in _crystal_activity:
         var site: Dictionary = session.game.permanent_sites.get(site_id, {})
