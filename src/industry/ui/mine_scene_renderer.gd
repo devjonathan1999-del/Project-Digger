@@ -7,6 +7,7 @@ const Layout = preload("res://src/industry/ui/mine_visual_layout.gd")
 const PIXELS_PER_METER := 7.0
 const SURFACE_Y := 72.0
 const GALLERY_HORIZONS := [12, 30, 60, 90, 120, 150]
+const SHAFT_PLATFORM_HORIZONS := [30, 60, 90, 120, 150]
 
 var surface_module_count := 0
 var gallery_detail_count := 0
@@ -15,6 +16,10 @@ var gallery_variants_seen: Dictionary = {}
 var gallery_silhouette_count := 0
 var broken_rail_count := 0
 var alcove_count := 0
+var shaft_platform_count := 0
+var shaft_utility_count := 0
+var surface_feature_count := 0
+var ventilation_visible := false
 
 var _session
 var _world: Control
@@ -39,6 +44,8 @@ func set_scene_state(state: Dictionary) -> void:
     gallery_detail_count = 5 if depth >= 30 else 3
     deep_accent_strength = accent_strength_for_depth(depth)
     _update_gallery_metrics(depth, center_level)
+    _update_shaft_metrics(depth)
+    _update_surface_metrics(center_level)
     queue_redraw()
 
 func accent_strength_for_depth(depth: int) -> float:
@@ -92,6 +99,19 @@ func _update_gallery_metrics(depth: int, center_level: int) -> void:
             if int(profile["alcove_side"]) >= 0:
                 alcove_count += 1
 
+func _update_shaft_metrics(depth: int) -> void:
+    shaft_platform_count = 0
+    for horizon in SHAFT_PLATFORM_HORIZONS:
+        if horizon <= depth:
+            shaft_platform_count += 1
+    shaft_utility_count = 4 if depth > 0 else 0
+
+func _update_surface_metrics(center_level: int) -> void:
+    var profile: Dictionary = Layout.surface_profile(center_level)
+    var modules: Array = profile["modules"]
+    surface_feature_count = modules.size()
+    ventilation_visible = modules.has("ventilation")
+
 func _draw() -> void:
     if _state.is_empty():
         return
@@ -136,21 +156,27 @@ func _draw_surface() -> void:
     var y := _depth_to_y(0.0)
     if y < -90.0 or y > size.y + 90.0:
         return
-    draw_rect(Rect2(0, y - 74.0, size.x, 74.0), Color("14212a"))
+    draw_rect(Rect2(0, y - 78.0, size.x, 78.0), Color("14212a"))
     draw_line(Vector2(0, y), Vector2(size.x, y), Color("8e6a48"), 3.0)
 
+    var profile: Dictionary = Layout.surface_profile(int(_state.get("center_level", 1)))
+    var modules: Array = profile["modules"]
     var center := size.x * 0.50
-    _draw_headframe(center, y)
-    _draw_workshop(size.x * 0.16, y)
-    _draw_silo(size.x * 0.30, y)
-    _draw_operations(size.x * 0.70, y)
-
-    var level := int(_state.get("center_level", 1))
-    if level >= 4:
-        _draw_crane(size.x * 0.83, y)
-    if level >= 5:
-        _draw_antenna(size.x * 0.91, y)
-    if level >= 6:
+    if modules.has("headframe"):
+        _draw_headframe(center, y)
+    if modules.has("workshop"):
+        _draw_workshop(size.x * 0.15, y)
+    if modules.has("silo"):
+        _draw_silo(size.x * 0.29, y)
+    if modules.has("operations"):
+        _draw_operations(size.x * 0.68, y)
+    if modules.has("ventilation"):
+        _draw_ventilation(size.x * 0.80, y, center)
+    if modules.has("crane"):
+        _draw_crane(size.x * 0.86, y)
+    if modules.has("antenna"):
+        _draw_antenna(size.x * 0.94, y)
+    if modules.has("pipe_network"):
         _draw_surface_pipe_network(y)
 
 func _draw_headframe(x: float, ground_y: float) -> void:
@@ -164,26 +190,48 @@ func _draw_headframe(x: float, ground_y: float) -> void:
     draw_line(Vector2(x, ground_y - 41), Vector2(x, ground_y + 12), copper, 2.0)
 
 func _draw_workshop(x: float, ground_y: float) -> void:
-    var rect := Rect2(x - 55, ground_y - 40, 110, 40)
+    var rect := Rect2(x - 58, ground_y - 42, 116, 42)
     draw_rect(rect, Color("394149"))
-    draw_rect(Rect2(rect.position + Vector2(7, 8), Vector2(42, 9)), Color("d3934f"))
-    draw_line(Vector2(x - 58, ground_y - 40), Vector2(x, ground_y - 55), Color("646f76"), 4.0)
-    draw_line(Vector2(x, ground_y - 55), Vector2(x + 58, ground_y - 40), Color("646f76"), 4.0)
-    for px in [-38.0, 0.0, 38.0]:
-        draw_circle(Vector2(x + px, ground_y - 6), 2.5, Color("d69a55"))
+    draw_line(Vector2(x - 62, ground_y - 42), Vector2(x, ground_y - 58), Color("646f76"), 4.0)
+    draw_line(Vector2(x, ground_y - 58), Vector2(x + 62, ground_y - 42), Color("646f76"), 4.0)
+    draw_rect(Rect2(x - 47, ground_y - 30, 42, 30), Color("252f35"))
+    draw_rect(Rect2(x - 41, ground_y - 24, 30, 6), Color("d3934f"))
+    draw_rect(Rect2(x + 25, ground_y - 55, 10, 18), Color("59656b"))
+    for px in [-50.0, 8.0, 48.0]:
+        draw_circle(Vector2(x + px, ground_y - 7), 2.5, Color("d69a55"))
 
 func _draw_silo(x: float, ground_y: float) -> void:
-    draw_rect(Rect2(x - 22, ground_y - 50, 44, 50), Color("59656b"))
+    draw_rect(Rect2(x - 22, ground_y - 50, 44, 42), Color("59656b"))
     draw_circle(Vector2(x, ground_y - 50), 22.0, Color("59656b"))
-    draw_line(Vector2(x - 13, ground_y), Vector2(x - 13, ground_y + 8), Color("868f93"), 3.0)
-    draw_line(Vector2(x + 13, ground_y), Vector2(x + 13, ground_y + 8), Color("868f93"), 3.0)
+    draw_colored_polygon(PackedVector2Array([
+        Vector2(x - 22, ground_y - 8),
+        Vector2(x + 22, ground_y - 8),
+        Vector2(x + 12, ground_y + 3),
+        Vector2(x - 12, ground_y + 3),
+    ]), Color("4d585e"))
+    draw_line(Vector2(x - 13, ground_y + 3), Vector2(x - 13, ground_y + 12), Color("868f93"), 3.0)
+    draw_line(Vector2(x + 13, ground_y + 3), Vector2(x + 13, ground_y + 12), Color("868f93"), 3.0)
     draw_rect(Rect2(x - 17, ground_y - 34, 34, 4), Color("c77b40"))
 
 func _draw_operations(x: float, ground_y: float) -> void:
-    draw_rect(Rect2(x - 65, ground_y - 45, 130, 45), Color("303b43"))
-    draw_rect(Rect2(x - 54, ground_y - 34, 48, 13), Color("53a8a5"))
-    draw_rect(Rect2(x + 8, ground_y - 34, 44, 13), Color("d09452"))
-    draw_line(Vector2(x - 70, ground_y - 46), Vector2(x + 70, ground_y - 46), Color("78838a"), 3.0)
+    draw_rect(Rect2(x - 68, ground_y - 47, 136, 47), Color("303b43"))
+    draw_line(Vector2(x - 72, ground_y - 48), Vector2(x + 72, ground_y - 48), Color("78838a"), 3.0)
+    for offset in [-47.0, -16.0, 15.0]:
+        draw_rect(Rect2(x + offset, ground_y - 35, 24, 13), Color("4b9190"))
+    draw_rect(Rect2(x + 45, ground_y - 31, 12, 22), Color("222d34"))
+    draw_circle(Vector2(x + 51, ground_y - 20), 2.0, Color("d09452"))
+
+func _draw_ventilation(x: float, ground_y: float, shaft_x: float) -> void:
+    var housing := Rect2(x - 30, ground_y - 38, 60, 38)
+    draw_rect(housing, Color("3d484e"))
+    var fan_center := Vector2(x, ground_y - 19)
+    draw_circle(fan_center, 14.0, Color("1c272d"))
+    draw_arc(fan_center, 14.0, 0.0, TAU, 24, Color("75848a"), 3.0)
+    for angle in [0.0, PI * 0.5, PI, PI * 1.5]:
+        draw_line(fan_center, fan_center + Vector2(cos(angle), sin(angle)) * 11.0, Color("75848a"), 3.0)
+    var duct_y := ground_y - 11.0
+    draw_line(Vector2(x - 30, duct_y), Vector2(shaft_x + 24, duct_y), Color("65747a"), 7.0)
+    draw_line(Vector2(shaft_x + 24, duct_y), Vector2(shaft_x + 24, ground_y + 12), Color("65747a"), 7.0)
 
 func _draw_crane(x: float, ground_y: float) -> void:
     var steel := Color("6e787d")
@@ -208,13 +256,42 @@ func _draw_shaft() -> void:
     var bottom_y := _depth_to_y(bottom_depth)
     var top := minf(top_y, bottom_y)
     var height := absf(bottom_y - top_y)
-    draw_rect(Rect2(x - 22, top, 44, height), Color("091117"))
-    draw_line(Vector2(x - 15, top_y), Vector2(x - 15, bottom_y), Color("69757b"), 3.0)
-    draw_line(Vector2(x + 15, top_y), Vector2(x + 15, bottom_y), Color("69757b"), 3.0)
-    draw_line(Vector2(x - 3, top_y), Vector2(x - 3, bottom_y), Color("b17140"), 1.5)
+    var steel := Color("69757b")
+    var amber := Color("cf8e4c")
+    draw_rect(Rect2(x - 27, top, 54, height), Color("091117"))
+
+    draw_line(Vector2(x - 18, top_y), Vector2(x - 18, bottom_y), steel, 3.0)
+    draw_line(Vector2(x + 18, top_y), Vector2(x + 18, bottom_y), steel, 3.0)
+    draw_line(Vector2(x - 7, top_y), Vector2(x - 7, bottom_y), Color("9a704b"), 1.5)
+    draw_line(Vector2(x + 7, top_y), Vector2(x + 7, bottom_y), Color("9a704b"), 1.5)
+    draw_line(Vector2(x - 24, top_y), Vector2(x - 24, bottom_y), Color("6d8288"), 2.0)
+    draw_line(Vector2(x + 24, top_y), Vector2(x + 24, bottom_y), Color("6d8288"), 2.0)
+
+    var travel_top := minf(top_y, bottom_y) + 22.0
+    var travel_bottom := maxf(top_y, bottom_y) - 28.0
+    var travel_span := maxf(0.0, travel_bottom - travel_top)
+    var elevator_t := fposmod(_phase() * 0.08, 1.0)
+    var elevator_y := travel_top + travel_span * elevator_t
+    draw_rect(Rect2(x - 13, elevator_y - 11, 26, 22), Color("48555b"))
+    draw_rect(Rect2(x - 8, elevator_y - 6, 16, 5), amber)
+
+    var counter_y := travel_bottom - travel_span * elevator_t
+    draw_rect(Rect2(x + 11, counter_y - 8, 9, 16), Color("7d6653"))
+
+    var previous_platform_y := top_y
     for depth_value in range(10, int(bottom_depth) + 1, 10):
         var y := _depth_to_y(float(depth_value))
-        draw_line(Vector2(x - 18, y), Vector2(x + 18, y), Color("39464d"), 1.0)
+        draw_line(Vector2(x - 20, y), Vector2(x + 20, y), Color("39464d"), 1.0)
+        if depth_value % 30 != 0:
+            continue
+        draw_rect(Rect2(x - 31, y - 3, 62, 6), Color("56646a"))
+        draw_line(Vector2(x - 31, y), Vector2(x - 54, y), Color("65747a"), 4.0)
+        draw_line(Vector2(x + 31, y), Vector2(x + 54, y), Color("65747a"), 4.0)
+        draw_line(Vector2(x - 20, previous_platform_y), Vector2(x + 20, y), Color("344147"), 1.0)
+        draw_line(Vector2(x + 20, previous_platform_y), Vector2(x - 20, y), Color("344147"), 1.0)
+        draw_circle(Vector2(x - 27, y - 8), 2.5, amber)
+        draw_circle(Vector2(x + 27, y - 8), 2.5, amber)
+        previous_platform_y = y
 
 func _draw_galleries() -> void:
     var current_depth := int(_state.get("depth", 0))
