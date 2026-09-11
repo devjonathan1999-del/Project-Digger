@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - feature/digger-v0.1
+      - feature/progression-v0.3
+      - main
+  pull_request:
+    branches:
       - main
   workflow_dispatch:
 
@@ -22,7 +26,87 @@ jobs:
           chmod +x Godot_v4.7.2-stable_linux.x86_64
           ./Godot_v4.7.2-stable_linux.x86_64 --version
 
+      - name: Import project
+        shell: bash
+        run: |
+          set +e
+          timeout 90s ./Godot_v4.7.2-stable_linux.x86_64 --headless --editor --quit --path . 2>&1 | tee godot-import.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-import.log; then
+            exit 1
+          fi
+
       - name: Run headless test suite
         shell: bash
         run: |
-          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_runner.gd
+          set +e
+          timeout 90s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_runner.gd 2>&1 | tee godot-tests.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-tests.log; then
+            exit 1
+          fi
+
+      - name: Exercise industry UI and capture layouts
+        shell: bash
+        run: |
+          set +e
+          timeout 90s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_industry_ui.gd -- --screenshots /tmp/digger-ui 2>&1 | tee godot-ui.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-ui.log; then
+            exit 1
+          fi
+
+      - name: Exercise progression context actions
+        shell: bash
+        run: |
+          set +e
+          timeout 90s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_progression_ui_actions.gd 2>&1 | tee godot-progression-ui.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-progression-ui.log; then
+            exit 1
+          fi
+
+      - name: Exercise strategic event UI
+        shell: bash
+        run: |
+          set +e
+          timeout 90s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_progression_ui_events.gd 2>&1 | tee godot-events-ui.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-events-ui.log; then
+            exit 1
+          fi
+
+      - name: Exercise modular mine visuals
+        shell: bash
+        run: |
+          set +e
+          timeout 90s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_progression_ui_visuals.gd 2>&1 | tee godot-visuals-ui.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then
+            exit "$status"
+          fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-visuals-ui.log; then
+            exit 1
+          fi
+
+      - name: Upload industry screenshots
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: industry-ui
+          path: /tmp/digger-ui
+          if-no-files-found: error
