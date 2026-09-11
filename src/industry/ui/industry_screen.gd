@@ -347,14 +347,14 @@ func _refresh_notices() -> void:
 func _refresh_offline_card() -> void:
     if _offline_card == null or _offline == null:
         return
-    var should_show := session.offline_seconds >= 5.0 and not _offline_dismissed
+    var should_show: bool = session.offline_seconds >= 5.0 and not _offline_dismissed
     _offline_card.visible = should_show
     _offline.visible = should_show
     if not should_show:
         return
     var report: Dictionary = session.offline_report
     var completed: Array = report.get("completed", [])
-    var pending_count := session.game.pending_events.size()
+    var pending_count: int = int(session.game.pending_events.size())
     var event_text := "%d événement%s en attente" % [pending_count, "s" if pending_count != 1 else ""]
     _offline.text = "Bon retour · %s d'absence\nRécolté : %s · %d travaux terminés · +%d m · %s" % [
         _duration(session.offline_seconds),
