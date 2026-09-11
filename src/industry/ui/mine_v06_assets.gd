@@ -2,7 +2,7 @@ class_name MineV06Assets
 extends RefCounted
 
 const PATHS := {
-    "surface_workshop": "res://assets/industry/v06/surface_workshop.png",
+    "surface_workshop": "res://assets/industry/v06/surface_workshop.svg",
     "surface_silo": "res://assets/industry/v06/surface_silo.png",
     "surface_control": "res://assets/industry/v06/surface_control.png",
     "surface_ventilation": "res://assets/industry/v06/surface_ventilation.png",
