@@ -29,10 +29,10 @@ godot --headless --path . -s res://tests/test_runner.gd
 Parcours UI réel avec rendu OpenGL sous Xvfb :
 
 ```bash
-xvfb-run -a godot --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_industry_ui.gd -- --screenshots /tmp/digger-v03-ui
+xvfb-run -a godot --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_industry_ui.gd -- --screenshots /tmp/digger-ui
 ```
 
-La CI ajoute également des parcours dédiés aux actions contextuelles, au **Filon instable** et aux états visuels modulaires. Le runner renvoie `0` si toutes les assertions passent et `1` sinon.
+La CI ajoute également des parcours dédiés aux actions contextuelles, au **Filon instable**, aux états visuels modulaires et à la présentation v0.4. Le runner renvoie `0` si toutes les assertions passent et `1` sinon.
 
 ## Boucle industrielle
 
@@ -95,7 +95,24 @@ La navigation principale comporte quatre entrées :
 
 La vue Mine reste l’écran principal. Elle permet un défilement vertical continu, un zoom limité et des raccourcis de profondeur. Les éléments interactifs ouvrent un panneau contextuel au lieu de transformer la mine en tableau de gestion.
 
-La couche visuelle est volontairement séparée de l’économie : ascenseur, convoyeurs, wagonnet, petites équipes, foreuse active et sites cristallins reflètent l’état du modèle sans calculer de production ni de récompense.
+## Présentation visuelle v0.4
+
+La v0.4 ne change **aucune règle économique**. Elle transforme la Mine en scène principale plus proche du jeu final :
+
+- HUD compact regroupant stocks, capacité et profondeur sans grosses cartes permanentes ;
+- Mine occupant l’essentiel de la zone de jeu ;
+- navigation basse affinée ;
+- panneau contextuel flottant sur écran large et **bottom-sheet** sur écran étroit ;
+- suppression du panneau permanent de commandes de foreuse ;
+- zones tactiles conservées mais rendues quasi invisibles, avec étiquettes courtes intégrées au décor ;
+- surface industrielle évolutive avec chevalement, atelier, silo, centre d’opérations, puis grue, antenne et réseau technique selon le niveau du Centre ;
+- galeries structurées avec rails, supports, tuyaux, câbles, lampes ambre et modules de machines ;
+- foreuse représentée comme une machine au front de taille ;
+- progression visuelle des profondeurs : acier/cuivre et lumière ambre au début, puis accents cyan/turquoise, cristaux et anomalies de plus en plus présents à partir des zones profondes.
+
+La direction visuelle cible environ **75 % rétro-futuriste industriel / 25 % sci-fi industriel sobre**. Les effets visuels ne calculent ni production ni récompense : `MineSceneRenderer` reçoit uniquement une copie d’état de présentation et les tests vérifient que plusieurs secondes d’animation ne modifient pas le snapshot économique.
+
+Les captures CI v0.4 couvrent les états **1280×800** et **720×1000**, avec panneau contextuel fermé puis ouvert.
 
 ## Sauvegarde et progression hors ligne
 
@@ -132,8 +149,12 @@ La CI Godot 4.7.2 vérifie notamment :
 - équivalence gros saut temporel / petits pas ;
 - interactions UI réelles ;
 - événement stratégique ;
-- états visuels modulaires ;
-- captures 1280 × 800 et 720 × 1000 publiées dans l’artefact `industry-ui`.
+- états visuels modulaires v0.3 ;
+- contrat de layout v0.4 ;
+- renderer industriel v0.4 et montée progressive des accents profonds ;
+- zones tactiles invisibles mais réellement cliquables ;
+- absence de mutation économique par le rendu ;
+- captures wide/narrow avec contexte fermé/ouvert publiées dans l’artefact `industry-ui`.
 
 Les captures CI utilisent un vrai rendu OpenGL sous Xvfb. Aucun test Windows ou Android n’est revendiqué à ce stade.
 
@@ -170,6 +191,11 @@ Quand le corridor final est ouvert, le HUD affiche :
 `Accès aux profondeurs ouvert — Vertical slice terminé`
 
 ## Documentation
+
+### Présentation visuelle v0.4
+
+- Design : `docs/superpowers/specs/2026-09-11-visual-v0.4-design.md`
+- Plan : `docs/superpowers/plans/2026-09-11-visual-v0.4.md`
 
 ### Progression v0.3
 

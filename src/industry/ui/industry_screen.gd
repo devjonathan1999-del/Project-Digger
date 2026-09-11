@@ -4,30 +4,41 @@ extends Control
 const Catalog = preload("res://src/industry/industry_catalog.gd")
 const Style = preload("res://src/industry/ui/industry_theme.gd")
 const MineWorldScript = preload("res://src/industry/ui/mine_world.gd")
+const MineSceneRendererScript = preload("res://src/industry/ui/mine_scene_renderer.gd")
+const MineInteractionPresenterScript = preload("res://src/industry/ui/mine_interaction_presenter.gd")
 const SitePanelScript = preload("res://src/industry/ui/site_panel.gd")
 const IndustryPanelScript = preload("res://src/industry/ui/industry_panel.gd")
 const CenterPanelScript = preload("res://src/industry/ui/center_panel.gd")
 const TechnologyPanelScript = preload("res://src/industry/ui/technology_panel.gd")
 
+const HUD_RESOURCE_LABELS := {
+    "iron": "Fer",
+    "coal": "Charbon",
+    "copper": "Cuivre",
+    "iron_ingot": "Lingot Fe",
+    "copper_ingot": "Lingot Cu",
+    "cable": "Câble",
+    "crystal": "Cristal",
+}
+
 var session
 var _wallet: Dictionary = {}
-var _wallet_grid: GridContainer
+var _compact_hud: GridContainer
+var _capacity: Label
 var _content_host: VBoxContainer
-var _mine_panel: VBoxContainer
-var _mine_layout: BoxContainer
+var _mine_panel: Control
+var _mine_stage: Control
 var _mine_world
+var _mine_renderer
+var _interaction_presenter
+var _overlay_layer: Control
+var _alert_stack: VBoxContainer
 var _site_panel
 var _milestone_buttons: Dictionary = {}
 var _industry_panel
 var _center_panel
 var _technology_panel
 var _depth: Label
-var _drill_info: Label
-var _drill_cost: Label
-var _drill_upgrade: Button
-var _dig: Button
-var _dig_info: Label
-var _dig_progress: ProgressBar
 var _event_banner: PanelContainer
 var _event_label: Label
 var _event_view: Button
@@ -37,6 +48,7 @@ var _offline_dismissed := false
 var _save_notice: Label
 var _save_status: Label
 var _tabs: Dictionary = {}
+var _bottom_navigation: HBoxContainer
 var _current_view := "mine"
 
 func _ready() -> void:
@@ -60,41 +72,22 @@ func _build() -> void:
 
     var outer := MarginContainer.new()
     outer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    for side in ["left", "right", "top", "bottom"]:
-        outer.add_theme_constant_override("margin_" + side, 16)
+    outer.add_theme_constant_override("margin_left", 12)
+    outer.add_theme_constant_override("margin_right", 12)
+    outer.add_theme_constant_override("margin_top", 10)
+    outer.add_theme_constant_override("margin_bottom", 10)
     add_child(outer)
 
     var shell := VBoxContainer.new()
     shell.name = "IndustryShell"
     shell.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shell.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    shell.add_theme_constant_override("separation", 10)
+    shell.add_theme_constant_override("separation", 6)
     outer.add_child(shell)
 
-    var header := HBoxContainer.new()
-    shell.add_child(header)
-    var title := VBoxContainer.new()
-    title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    title.add_theme_constant_override("separation", 1)
-    header.add_child(title)
-    _label(title, "D I G G E R  /  INDUSTRIES", 22)
-    _label(title, "Progression verticale", 13, Style.MUTED)
-    _depth = _label(header, "", 27, Style.COPPER)
+    _build_compact_hud(shell)
 
-    _wallet_grid = GridContainer.new()
-    _wallet_grid.name = "WalletGrid"
-    shell.add_child(_wallet_grid)
-    for id in Catalog.RESOURCES:
-        var box := _card(_wallet_grid, 8)
-        _label(box, Catalog.RESOURCES[id]["label"], 12, Style.MUTED)
-        var number := _label(box, "0", 19, Style.ACCENT if Catalog.RESOURCES[id]["raw"] else Style.COPPER)
-        number.name = "Stock_" + id
-        _wallet[id] = number
-
-    _build_event_banner(shell)
-    _build_offline_card(shell)
-
-    _save_notice = _label(shell, "", 14, Style.COPPER)
+    _save_notice = _label(shell, "", 12, Style.COPPER)
     _save_notice.name = "SaveNotice"
 
     var scroll := ScrollContainer.new()
@@ -103,51 +96,188 @@ func _build() -> void:
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     shell.add_child(scroll)
+
     var content_margin := MarginContainer.new()
     content_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    content_margin.add_theme_constant_override("margin_right", 8)
+    content_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    content_margin.add_theme_constant_override("margin_right", 4)
     scroll.add_child(content_margin)
+
     _content_host = VBoxContainer.new()
     _content_host.name = "ContentHost"
     _content_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _content_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
     content_margin.add_child(_content_host)
 
     _build_mine_panel()
+
     _industry_panel = IndustryPanelScript.new()
     _content_host.add_child(_industry_panel)
     _industry_panel.bind_session(session)
+
     _center_panel = CenterPanelScript.new()
     _content_host.add_child(_center_panel)
     _center_panel.bind_session(session)
+
     _technology_panel = TechnologyPanelScript.new()
     _content_host.add_child(_technology_panel)
     _technology_panel.bind_session(session)
 
-    _save_status = _label(shell, "", 12, Style.MUTED)
+    _save_status = _label(shell, "", 10, Style.MUTED)
     _save_status.name = "SaveStatus"
 
-    var nav := HBoxContainer.new()
-    nav.name = "BottomNavigation"
-    nav.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    shell.add_child(nav)
-    _add_tab(nav, "Mine", "TabMine", "mine")
-    _add_tab(nav, "Industrie", "TabIndustrie", "industry")
-    _add_tab(nav, "Centre", "TabCentre", "center")
-    _add_tab(nav, "Technologie", "TabTechnologie", "technology")
+    _bottom_navigation = HBoxContainer.new()
+    _bottom_navigation.name = "BottomNavigation"
+    _bottom_navigation.custom_minimum_size.y = 44
+    _bottom_navigation.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _bottom_navigation.add_theme_constant_override("separation", 8)
+    shell.add_child(_bottom_navigation)
+    _add_tab(_bottom_navigation, "Mine", "TabMine", "mine")
+    _add_tab(_bottom_navigation, "Industrie", "TabIndustrie", "industry")
+    _add_tab(_bottom_navigation, "Centre", "TabCentre", "center")
+    _add_tab(_bottom_navigation, "Technologie", "TabTechnologie", "technology")
+
+func _build_compact_hud(parent: Node) -> void:
+    _compact_hud = GridContainer.new()
+    _compact_hud.name = "CompactHUD"
+    _compact_hud.columns = 10
+    _compact_hud.custom_minimum_size.y = 40
+    _compact_hud.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _compact_hud.add_theme_constant_override("h_separation", 5)
+    _compact_hud.add_theme_constant_override("v_separation", 4)
+    parent.add_child(_compact_hud)
+
+    var title_chip := _hud_panel(_compact_hud, 86)
+    var title := _label(title_chip, "DIGGER", 16, Style.TEXT)
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+    for id in Catalog.RESOURCES:
+        var chip := _hud_panel(_compact_hud, 84)
+        var row := HBoxContainer.new()
+        row.add_theme_constant_override("separation", 4)
+        chip.add_child(row)
+        var short_label := str(HUD_RESOURCE_LABELS.get(id, Catalog.RESOURCES[id]["label"]))
+        var caption := _label(row, short_label, 10, Style.MUTED)
+        caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        var number := _label(row, "0", 15, Style.ACCENT if Catalog.RESOURCES[id]["raw"] else Style.COPPER)
+        number.name = "Stock_" + id
+        number.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+        _wallet[id] = number
+
+    var capacity_chip := _hud_panel(_compact_hud, 108)
+    _capacity = _label(capacity_chip, "Capacité 0/0", 11, Style.MUTED)
+    _capacity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _capacity.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+    var depth_chip := _hud_panel(_compact_hud, 82)
+    _depth = _label(depth_chip, "−0 m", 18, Style.COPPER)
+    _depth.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    _depth.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+
+func _hud_panel(parent: Node, min_width: float) -> PanelContainer:
+    var panel := PanelContainer.new()
+    panel.custom_minimum_size = Vector2(min_width, 36)
+    panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    panel.add_theme_stylebox_override("panel", Style.panel(Color("111d29"), Color("283d4b"), 5))
+    parent.add_child(panel)
+    return panel
+
+func _build_mine_panel() -> void:
+    _mine_panel = Control.new()
+    _mine_panel.name = "MinePanel"
+    _mine_panel.custom_minimum_size = Vector2(0, 540)
+    _mine_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    _mine_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    _content_host.add_child(_mine_panel)
+
+    _mine_stage = Control.new()
+    _mine_stage.name = "MineStage"
+    _mine_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    _mine_panel.add_child(_mine_stage)
+    _mine_stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+    var world_card := PanelContainer.new()
+    world_card.name = "MineWorldCard"
+    world_card.mouse_filter = Control.MOUSE_FILTER_PASS
+    world_card.add_theme_stylebox_override("panel", Style.panel(Color("0a131c"), Color("2d4553"), 4))
+    _mine_stage.add_child(world_card)
+    world_card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+    _mine_world = MineWorldScript.new()
+    world_card.add_child(_mine_world)
+    _mine_world.bind_session(session)
+    _mine_world.selection_changed.connect(_on_world_selection)
+
+    _mine_renderer = MineSceneRendererScript.new()
+    _mine_world.add_child(_mine_renderer)
+    _mine_world.move_child(_mine_renderer, 0)
+    _mine_renderer.bind(session, _mine_world)
+
+    _interaction_presenter = MineInteractionPresenterScript.new()
+    _mine_world.add_child(_interaction_presenter)
+    _interaction_presenter.bind(_mine_world)
+
+    _overlay_layer = Control.new()
+    _overlay_layer.name = "MineOverlayLayer"
+    _overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    _mine_stage.add_child(_overlay_layer)
+    _overlay_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+    _build_camera_shortcuts(_overlay_layer)
+    _build_alert_stack(_overlay_layer)
+
+    _site_panel = SitePanelScript.new()
+    _overlay_layer.add_child(_site_panel)
+
+func _build_camera_shortcuts(parent: Control) -> void:
+    var shortcut_panel := PanelContainer.new()
+    shortcut_panel.name = "MineShortcutPanel"
+    shortcut_panel.position = Vector2(12, 12)
+    shortcut_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+    shortcut_panel.add_theme_stylebox_override("panel", Style.panel(Color("0f1b25d8"), Color("4a6572"), 5))
+    parent.add_child(shortcut_panel)
+
+    var camera_row := HFlowContainer.new()
+    camera_row.name = "MineCameraShortcuts"
+    camera_row.custom_minimum_size = Vector2(360, 36)
+    camera_row.add_theme_constant_override("h_separation", 5)
+    camera_row.add_theme_constant_override("v_separation", 4)
+    shortcut_panel.add_child(camera_row)
+
+    var surface := _compact_button(camera_row, "Surface", "FocusSurface")
+    surface.pressed.connect(_focus_depth.bind(0))
+    var drill_focus := _compact_button(camera_row, "Foreuse", "FocusDrill")
+    drill_focus.pressed.connect(_focus_drill)
+    for milestone in [30, 60, 90, 120, 150]:
+        var focus := _compact_button(camera_row, "%d m" % milestone, "Focus%d" % milestone)
+        focus.pressed.connect(_focus_depth.bind(milestone))
+        _milestone_buttons[milestone] = focus
+
+func _build_alert_stack(parent: Control) -> void:
+    _alert_stack = VBoxContainer.new()
+    _alert_stack.name = "MineAlertStack"
+    _alert_stack.position = Vector2(12, 58)
+    _alert_stack.custom_minimum_size.x = 440
+    _alert_stack.mouse_filter = Control.MOUSE_FILTER_PASS
+    _alert_stack.add_theme_constant_override("separation", 6)
+    parent.add_child(_alert_stack)
+    _build_event_banner(_alert_stack)
+    _build_offline_card(_alert_stack)
 
 func _build_event_banner(parent: Node) -> void:
     _event_banner = PanelContainer.new()
     _event_banner.name = "PendingEventBanner"
     _event_banner.visible = false
     _event_banner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _event_banner.add_theme_stylebox_override("panel", Style.panel(Color("1d2b32"), Style.COPPER, 10))
+    _event_banner.add_theme_stylebox_override("panel", Style.panel(Color("261f1ae8"), Style.COPPER, 7))
     parent.add_child(_event_banner)
     var row := HBoxContainer.new()
-    row.add_theme_constant_override("separation", 10)
+    row.add_theme_constant_override("separation", 8)
     _event_banner.add_child(row)
-    _event_label = _label(row, "", 14, Style.COPPER)
-    _event_view = _button(row, "VOIR", "PendingEventView")
-    _event_view.custom_minimum_size.x = 100
+    _event_label = _label(row, "", 12, Style.COPPER)
+    _event_view = _compact_button(row, "VOIR", "PendingEventView")
+    _event_view.custom_minimum_size.x = 84
     _event_view.pressed.connect(_open_event)
 
 func _build_offline_card(parent: Node) -> void:
@@ -155,78 +285,20 @@ func _build_offline_card(parent: Node) -> void:
     _offline_card.name = "OfflineCard"
     _offline_card.visible = false
     _offline_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _offline_card.add_theme_stylebox_override("panel", Style.panel(Color("102c30"), Style.ACCENT, 10))
+    _offline_card.add_theme_stylebox_override("panel", Style.panel(Color("102b2ee8"), Style.ACCENT, 7))
     parent.add_child(_offline_card)
     var row := HBoxContainer.new()
-    row.add_theme_constant_override("separation", 10)
+    row.add_theme_constant_override("separation", 8)
     _offline_card.add_child(row)
-    _offline = _label(row, "", 14, Style.ACCENT)
+    _offline = _label(row, "", 12, Style.ACCENT)
     _offline.name = "OfflineNotice"
-    var close := _button(row, "×", "OfflineClose")
-    close.custom_minimum_size = Vector2(40, 40)
+    var close := _compact_button(row, "×", "OfflineClose")
+    close.custom_minimum_size = Vector2(32, 32)
     close.pressed.connect(_dismiss_offline)
-
-func _build_mine_panel() -> void:
-    _mine_panel = VBoxContainer.new()
-    _mine_panel.name = "MinePanel"
-    _mine_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _mine_panel.add_theme_constant_override("separation", 12)
-    _content_host.add_child(_mine_panel)
-    _label(_mine_panel, "MINE", 22)
-    _label(_mine_panel, "Fais glisser la coupe verticale, sélectionne un élément et ouvre de nouveaux horizons.", 14, Style.MUTED)
-
-    var camera_row := HBoxContainer.new()
-    camera_row.name = "MineCameraShortcuts"
-    camera_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _mine_panel.add_child(camera_row)
-    var surface := _button(camera_row, "Surface", "FocusSurface")
-    surface.pressed.connect(_focus_depth.bind(0))
-    var drill_focus := _button(camera_row, "Foreuse", "FocusDrill")
-    drill_focus.pressed.connect(_focus_drill)
-    for milestone in [30, 60, 90, 120, 150]:
-        var focus := _button(camera_row, "%d m" % milestone, "Focus%d" % milestone)
-        focus.pressed.connect(_focus_depth.bind(milestone))
-        _milestone_buttons[milestone] = focus
-
-    _mine_layout = BoxContainer.new()
-    _mine_layout.name = "MineWorldLayout"
-    _mine_layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    _mine_layout.add_theme_constant_override("separation", 14)
-    _mine_panel.add_child(_mine_layout)
-
-    var world_card := PanelContainer.new()
-    world_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    world_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    world_card.add_theme_stylebox_override("panel", Style.panel(Color("0d1821"), Color("294052"), 6))
-    _mine_layout.add_child(world_card)
-    _mine_world = MineWorldScript.new()
-    world_card.add_child(_mine_world)
-    _mine_world.bind_session(session)
-    _mine_world.selection_changed.connect(_on_world_selection)
-
-    var side := VBoxContainer.new()
-    side.name = "MineSidePanel"
-    side.custom_minimum_size.x = 280
-    side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    side.add_theme_constant_override("separation", 12)
-    _mine_layout.add_child(side)
-
-    _site_panel = SitePanelScript.new()
-    side.add_child(_site_panel)
-
-    var drill := _card(side)
-    _label(drill, "COMMANDES FOREUSE", 14, Style.MUTED)
-    _drill_info = _label(drill, "", 16)
-    _drill_cost = _label(drill, "", 13, Style.COPPER)
-    _drill_upgrade = _button(drill, "Améliorer la foreuse", "DrillUpgrade")
-    _drill_upgrade.pressed.connect(_upgrade_drill)
-    _dig_info = _label(drill, "", 13, Style.MUTED)
-    _dig_progress = _progress(drill, "ExcavationProgress")
-    _dig = _button(drill, "", "ExcavationStart")
-    _dig.pressed.connect(_start_excavation)
 
 func _add_tab(parent: Node, title: String, node_name: String, view_id: String) -> void:
     var button := _button(parent, title, node_name)
+    button.custom_minimum_size.y = 40
     button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     button.pressed.connect(_select_view.bind(view_id))
     _tabs[view_id] = button
@@ -255,22 +327,9 @@ func _refresh() -> void:
         return
     var game = session.game
     _depth.text = "−%d m" % game.depth
+    _capacity.text = "Capacité %d/%d" % [game.used_capacity(), game.total_capacity()]
     for id in _wallet:
         _wallet[id].text = str(floori(game.resources[id]))
-    var maximum: bool = game.drill_level >= Catalog.MAX_DRILL_LEVEL
-    var affordable: bool = game.can_afford(game.drill_upgrade_cost())
-    _drill_info.text = "Niveau %d / %d · Objectif : −%d m" % [game.drill_level, Catalog.MAX_DRILL_LEVEL, game.depth + 10]
-    _drill_cost.text = "Niveau maximum" if maximum else "%s\n%s" % [_cost(game.drill_upgrade_cost()), "Amélioration disponible" if affordable else "Ressources insuffisantes"]
-    _drill_upgrade.disabled = maximum or not affordable
-    var reason: String = game.excavation_block_reason()
-    _dig.disabled = reason != ""
-    _dig.text = "Ouvrir le chantier · %s" % _duration(game.excavation_duration())
-    _dig_progress.value = 0
-    if game.jobs.has("drill"):
-        _dig_info.text = "Forage en cours · reste %s" % _duration(game.jobs["drill"]["remaining"])
-        _dig_progress.value = _percent(game.jobs["drill"])
-    else:
-        _dig_info.text = "Chantier disponible · +10 m" if reason == "" else reason
     _refresh_milestone_buttons()
     _mine_world.refresh()
     if _site_panel.visible:
@@ -293,16 +352,16 @@ func _refresh_event_banner() -> void:
         _event_banner.visible = true
         var resource_id := str(game.active_event.get("resource", ""))
         if resource_id == "":
-            _event_label.text = "Filon instable détecté — choisir une priorité d'exploitation"
+            _event_label.text = "Filon instable détecté — choisir une priorité"
             _event_view.text = "CHOISIR"
         else:
             var label := str(Catalog.RESOURCES[resource_id]["label"])
-            _event_label.text = "Filon instable · %s · %s restantes" % [label, _duration(float(game.active_event.get("remaining", 0.0)))]
+            _event_label.text = "Filon instable · %s · %s" % [label, _duration(float(game.active_event.get("remaining", 0.0)))]
             _event_view.text = "DÉTAILS"
         return
     if not game.pending_events.is_empty():
         _event_banner.visible = true
-        _event_label.text = "Filon instable détecté — choisir une priorité d'exploitation"
+        _event_label.text = "Filon instable détecté — choisir une priorité"
         _event_view.text = "VOIR"
         return
     _event_banner.visible = false
@@ -334,10 +393,10 @@ func _dismiss_offline() -> void:
 func _refresh_notices() -> void:
     _save_notice.visible = session.save_blocked or session.save_error != ""
     if session.save_blocked:
-        _save_notice.text = "Sauvegarde : %s\nLa sauvegarde d'origine est préservée. La progression de cette session provisoire ne sera pas enregistrée." % session.save_error
+        _save_notice.text = "Sauvegarde : %s · fichier d'origine préservé · session provisoire non enregistrée." % session.save_error
         _save_status.text = "Enregistrement désactivé · Session provisoire."
     elif session.save_error != "":
-        _save_notice.text = "Sauvegarde : %s\nNouvelle tentative automatique. La progression récente n'est pas encore enregistrée." % session.save_error
+        _save_notice.text = "Sauvegarde : %s · nouvelle tentative automatique." % session.save_error
         _save_status.text = "Enregistrement en attente · Nouvelle tentative automatique."
     else:
         _save_notice.text = ""
@@ -355,8 +414,8 @@ func _refresh_offline_card() -> void:
     var report: Dictionary = session.offline_report
     var completed: Array = report.get("completed", [])
     var pending_count: int = int(session.game.pending_events.size())
-    var event_text := "%d événement%s en attente" % [pending_count, "s" if pending_count != 1 else ""]
-    _offline.text = "Bon retour · %s d'absence\nRécolté : %s · %d travaux terminés · +%d m · %s" % [
+    var event_text := "%d événement%s" % [pending_count, "s" if pending_count != 1 else ""]
+    _offline.text = "Retour · %s · %s · %d travaux · +%d m · %s" % [
         _duration(session.offline_seconds),
         _cost(report.get("produced", {})),
         completed.size(),
@@ -365,20 +424,17 @@ func _refresh_offline_card() -> void:
     ]
 
 func _responsive() -> void:
-    if _wallet_grid == null:
+    if _compact_hud == null:
         return
-    var narrow := size.x < 1000
-    _wallet_grid.columns = 3 if narrow else 7
-    if _mine_layout != null:
-        _mine_layout.vertical = size.x < 880
+    var narrow := size.x < 900
+    _compact_hud.columns = 5 if narrow else 10
+    if _site_panel != null:
+        _site_panel.set_layout_mode("bottom_sheet" if narrow else "floating_right")
+    if _alert_stack != null:
+        _alert_stack.custom_minimum_size.x = 0 if narrow else 440
+        _alert_stack.size.x = minf(440.0, maxf(300.0, size.x - 72.0))
     if _industry_panel != null:
         _industry_panel._responsive()
-
-func _upgrade_drill() -> void:
-    session.upgrade_drill()
-
-func _start_excavation() -> void:
-    session.start_excavation()
 
 func _cost(cost: Dictionary, multiplier: int = 1) -> String:
     var parts := PackedStringArray()
@@ -393,9 +449,6 @@ func _duration(seconds: float) -> String:
     if rounded >= 60:
         return "%d min %02d s" % [rounded / 60, rounded % 60]
     return "%d s" % rounded
-
-func _percent(job: Dictionary) -> float:
-    return 100.0 * (1.0 - float(job["remaining"]) / float(job["duration"]))
 
 func _card(parent: Node, padding: int = 16) -> VBoxContainer:
     var panel := PanelContainer.new()
@@ -424,10 +477,11 @@ func _button(parent: Node, title: String, node_name: String) -> Button:
     parent.add_child(button)
     return button
 
-func _progress(parent: Node, node_name: String) -> ProgressBar:
-    var bar := ProgressBar.new()
-    bar.name = node_name
-    bar.custom_minimum_size.y = 8
-    bar.show_percentage = false
-    parent.add_child(bar)
-    return bar
+func _compact_button(parent: Node, title: String, node_name: String) -> Button:
+    var button := Button.new()
+    button.name = node_name
+    button.text = title
+    button.custom_minimum_size = Vector2(62, 32)
+    button.add_theme_font_size_override("font_size", 12)
+    parent.add_child(button)
+    return button
