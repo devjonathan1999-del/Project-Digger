@@ -55,6 +55,13 @@ func _run() -> void:
             t.check(drill_target.modulate.a <= 0.08, "zone foreuse intégrée au décor")
         t.check(world.find_child("Label_Drill", true, false) != null, "étiquette foreuse séparée")
 
+        var before: Dictionary = session.game.snapshot()
+        for index in range(120):
+            world._process(1.0 / 60.0)
+            if renderer != null:
+                renderer._process(1.0 / 60.0)
+        t.equal(session.game.snapshot(), before, "le rendu v0.4 n'altère jamais l'économie")
+
     screen.queue_free()
     await process_frame
     _cleanup()
