@@ -437,14 +437,6 @@ func _duration(seconds: float) -> String:
         return "%d min %02d s" % [rounded / 60, rounded % 60]
     return "%d s" % rounded
 
-func _hud_panel(parent: Node, min_width: float) -> PanelContainer:
-    var panel := PanelContainer.new()
-    panel.custom_minimum_size = Vector2(min_width, 36)
-    panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    panel.add_theme_stylebox_override("panel", Style.panel(Color("111d29"), Color("283d4b"), 5))
-    parent.add_child(panel)
-    return panel
-
 func _card(parent: Node, padding: int = 16) -> VBoxContainer:
     var panel := PanelContainer.new()
     panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
