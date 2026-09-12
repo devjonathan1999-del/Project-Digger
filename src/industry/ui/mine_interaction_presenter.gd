@@ -2,6 +2,7 @@ class_name MineInteractionPresenter
 extends Control
 
 const Style = preload("res://src/industry/ui/industry_theme.gd")
+const ModuleRenderer = preload("res://src/industry/ui/mine_module_renderer.gd")
 
 const REST_ALPHA := 0.34
 const EMPHASIZED_ALPHA := 1.0
@@ -9,6 +10,7 @@ const EMPHASIZED_ALPHA := 1.0
 var _world: Control
 var _labels: Dictionary = {}
 var _selected_key := ""
+var _module_renderer: Control
 
 func _ready() -> void:
     name = "MineInteractionPresenter"
@@ -20,6 +22,8 @@ func bind(world: Control) -> void:
     _world = world
     if _world != null and _world.has_signal("selection_changed") and not _world.selection_changed.is_connected(_on_world_selection):
         _world.selection_changed.connect(_on_world_selection)
+    _ensure_module_renderer()
+    _sync_module_renderer()
     _sync()
 
 func set_selected_key(key: String) -> void:
@@ -39,7 +43,44 @@ func marker_is_emphasized(key: String) -> bool:
 func _process(_delta: float) -> void:
     if _world == null or not is_instance_valid(_world):
         return
+    _sync_module_renderer()
     _sync()
+
+func _ensure_module_renderer() -> void:
+    if _world == null or not is_instance_valid(_world):
+        return
+    var existing := _world.find_child("MineModuleRenderer", false, false)
+    if existing != null:
+        _module_renderer = existing as Control
+        return
+    _module_renderer = ModuleRenderer.new()
+    _world.add_child(_module_renderer)
+    var presenter_index := get_index()
+    if presenter_index >= 0:
+        _world.move_child(_module_renderer, presenter_index)
+
+func _sync_module_renderer() -> void:
+    if _world == null or not is_instance_valid(_world):
+        return
+    _ensure_module_renderer()
+    if _module_renderer == null or not is_instance_valid(_module_renderer):
+        return
+    var session_value = _world.get("session")
+    if session_value == null:
+        return
+    var game = session_value.game
+    _module_renderer.set_scene_state({
+        "depth": game.depth,
+        "center_level": game.center_level,
+        "mine_levels": game.mine_levels.duplicate(true),
+        "discoveries": game.discoveries.duplicate(true),
+        "permanent_sites": game.permanent_sites.duplicate(true),
+        "jobs": game.jobs.duplicate(true),
+        "scroll_depth": float(_world.get("scroll_depth")),
+        "zoom": float(_world.get("zoom")),
+        "animation_phase": float(_world.get("animation_phase")),
+        "viewport_size": _world.size,
+    })
 
 func _sync() -> void:
     if _world == null or not is_instance_valid(_world):
