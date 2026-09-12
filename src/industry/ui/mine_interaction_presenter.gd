@@ -4,7 +4,7 @@ extends Control
 const Style = preload("res://src/industry/ui/industry_theme.gd")
 const ModuleRenderer = preload("res://src/industry/ui/mine_module_renderer.gd")
 
-const REST_ALPHA := 0.34
+const REST_ALPHA := 0.24
 const EMPHASIZED_ALPHA := 1.0
 
 var _world: Control
