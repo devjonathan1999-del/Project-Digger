@@ -4,6 +4,7 @@ extends "res://src/industry/ui/mine_final_module_renderer.gd"
 const V07Assets = preload("res://src/industry/ui/mine_v07_assets.gd")
 const STATION_DEPTHS: Array[int] = [30, 60, 90, 120, 150]
 const SHALLOW_RESOURCE_ASSETS: Array[String] = ["iron_installation", "coal_installation", "copper_installation"]
+const NARROW_RESOURCE_SAFE_TOP := 160.0
 
 var _session
 var _world: Control
@@ -229,18 +230,26 @@ func _resource_v07_rects(viewport_size: Vector2, depth: int, narrow: bool) -> Di
             rects["crystal_installation"] = Rect2(viewport_size.x * 0.77 - 210.0, crystal_y - 105.0, 420.0, 210.0)
     return rects
 
+func _shallow_resource_visible(target: Rect2, narrow: bool) -> bool:
+    if target.end.y < -170.0 or target.position.y > size.y + 170.0:
+        return false
+    if narrow and target.position.y < NARROW_RESOURCE_SAFE_TOP:
+        return false
+    return true
+
 func _draw_resource_installations() -> void:
     var depth := int(_state.get("depth", 0))
     var viewport_size: Vector2 = _state.get("viewport_size", size)
     if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
         viewport_size = size
-    var rects := _resource_v07_rects(viewport_size, depth, size.x < 800.0)
+    var narrow := size.x < 800.0
+    var rects := _resource_v07_rects(viewport_size, depth, narrow)
 
     for asset_id in SHALLOW_RESOURCE_ASSETS:
         if not rects.has(asset_id):
             continue
         var target: Rect2 = rects[asset_id]
-        if target.end.y < -170.0 or target.position.y > size.y + 170.0:
+        if not _shallow_resource_visible(target, narrow):
             continue
         _draw_resource_cavity(target, asset_id)
         var actual := _draw_v07_asset(asset_id, target)
@@ -256,20 +265,42 @@ func _draw_resource_installations() -> void:
             var actual_crystal := _draw_v07_asset("crystal_installation", crystal_target)
             _draw_resource_foreground(actual_crystal, "crystal_installation")
 
-func _draw_resource_cavity(target: Rect2, asset_id: String) -> void:
+func _resource_cavity_polygon(target: Rect2) -> PackedVector2Array:
     var pad_x := target.size.x * 0.07
     var pad_y := target.size.y * 0.14
     var cavity := Rect2(target.position - Vector2(pad_x, pad_y), target.size + Vector2(pad_x * 2.0, pad_y * 2.0))
-    var cavity_color := Color(0.025, 0.045, 0.052, 0.96)
+    var w := cavity.size.x
+    var h := cavity.size.y
+    var x := cavity.position.x
+    var y := cavity.position.y
+    return PackedVector2Array([
+        Vector2(x + w * 0.05, y + h * 0.16),
+        Vector2(x + w * 0.20, y + h * 0.02),
+        Vector2(x + w * 0.46, y + h * 0.07),
+        Vector2(x + w * 0.76, y),
+        Vector2(x + w * 0.96, y + h * 0.17),
+        Vector2(x + w, y + h * 0.47),
+        Vector2(x + w * 0.97, y + h * 0.80),
+        Vector2(x + w * 0.80, y + h),
+        Vector2(x + w * 0.54, y + h * 0.95),
+        Vector2(x + w * 0.27, y + h),
+        Vector2(x + w * 0.04, y + h * 0.82),
+        Vector2(x, y + h * 0.55),
+    ])
+
+func _draw_resource_cavity(target: Rect2, asset_id: String) -> void:
+    var cavity := _resource_cavity_polygon(target)
+    var cavity_color := Color(0.025, 0.045, 0.052, 0.88)
     if asset_id == "coal_installation":
-        cavity_color = Color(0.022, 0.028, 0.030, 0.98)
+        cavity_color = Color(0.022, 0.028, 0.030, 0.90)
     elif asset_id == "copper_installation":
-        cavity_color = Color(0.045, 0.055, 0.050, 0.97)
+        cavity_color = Color(0.045, 0.055, 0.050, 0.88)
     elif asset_id == "crystal_installation":
-        cavity_color = Color(0.025, 0.060, 0.070, 0.98)
-    draw_rect(cavity, cavity_color)
-    draw_line(Vector2(cavity.position.x, cavity.position.y + 8.0), Vector2(cavity.end.x, cavity.position.y + 2.0), Color(0.34, 0.35, 0.32, 0.38), 5.0)
-    draw_line(Vector2(cavity.position.x, cavity.end.y - 3.0), Vector2(cavity.end.x, cavity.end.y - 9.0), Color(0.22, 0.24, 0.23, 0.52), 6.0)
+        cavity_color = Color(0.025, 0.060, 0.070, 0.90)
+    draw_colored_polygon(cavity, cavity_color)
+    var outline := cavity.duplicate()
+    outline.append(cavity[0])
+    draw_polyline(outline, Color(0.28, 0.30, 0.28, 0.34), 4.0, true)
 
 func _draw_resource_foreground(actual: Rect2, asset_id: String) -> void:
     if actual.size.x <= 0.0:

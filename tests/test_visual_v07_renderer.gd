@@ -127,6 +127,46 @@ func _init() -> void:
         push_error("illustrated elevator must stay inside shaft bounds")
         failures += 1
 
+    # v0.7.1 polish: resource caves must frame illustrations without a pasted rectangular panel.
+    if not renderer.has_method("_resource_cavity_polygon"):
+        push_error("resource cavities must expose an irregular polygon silhouette")
+        failures += 1
+    else:
+        var target := Rect2(100.0, 120.0, 320.0, 166.0)
+        var cavity: PackedVector2Array = renderer._resource_cavity_polygon(target)
+        if cavity.size() < 8:
+            push_error("resource cavity silhouette must be irregular, not a four-corner rectangle")
+            failures += 1
+        if cavity.size() > 0:
+            var min_x := cavity[0].x
+            var max_x := cavity[0].x
+            var min_y := cavity[0].y
+            var max_y := cavity[0].y
+            for point in cavity:
+                min_x = minf(min_x, point.x)
+                max_x = maxf(max_x, point.x)
+                min_y = minf(min_y, point.y)
+                max_y = maxf(max_y, point.y)
+            if max_x - min_x <= target.size.x or max_y - min_y <= target.size.y:
+                push_error("resource cavity must still frame the full illustrated installation")
+                failures += 1
+
+    # Mobile polish: shallow resource installations must not sit underneath the depth jump controls.
+    if not renderer.has_method("_shallow_resource_visible"):
+        push_error("renderer must expose shallow-resource visibility rules")
+        failures += 1
+    else:
+        renderer.size = Vector2(720, 1000)
+        if renderer._shallow_resource_visible(Rect2(10.0, 90.0, 220.0, 118.0), true):
+            push_error("mobile shallow installation overlapping the depth controls must be hidden")
+            failures += 1
+        if not renderer._shallow_resource_visible(Rect2(10.0, 180.0, 220.0, 118.0), true):
+            push_error("mobile shallow installation below the depth controls must remain visible")
+            failures += 1
+        if not renderer._shallow_resource_visible(Rect2(10.0, 90.0, 220.0, 118.0), false):
+            push_error("desktop shallow installation visibility must remain unchanged")
+            failures += 1
+
     renderer.free()
     world.free()
     quit(1 if failures > 0 else 0)
