@@ -3,6 +3,7 @@ extends "res://src/industry/ui/mine_final_module_renderer.gd"
 
 const V07Assets = preload("res://src/industry/ui/mine_v07_assets.gd")
 const STATION_DEPTHS: Array[int] = [30, 60, 90, 120, 150]
+const SHALLOW_RESOURCE_ASSETS: Array[String] = ["iron_installation", "coal_installation", "copper_installation"]
 
 var _session
 var _world: Control
@@ -72,7 +73,6 @@ func _update_v07_metrics() -> void:
         if station_depth <= depth:
             station_count += 1
 
-    var resource_count := 3 + (1 if depth >= 90 else 0)
     var all_assets_available := true
     for asset_id in [
         "surface_workshop", "surface_silo", "surface_ventilation", "surface_crane",
@@ -104,20 +104,37 @@ func _update_v07_metrics() -> void:
     var elevator_rect := _elevator_v07_rect(shaft_rect, depth)
     var elevator_inside := elevator_rect.size.x > 0.0 and elevator_rect.position.x >= shaft_rect.position.x and elevator_rect.end.x <= shaft_rect.end.x
 
+    var resource_ids := _resource_asset_ids(depth)
+    var resource_targets := _resource_v07_rects(viewport_size, depth, viewport_size.x < 800.0)
+    var resource_rects: Dictionary = {}
+    var resources_use_assets := true
+    for resource_id_value in resource_ids:
+        var resource_id := str(resource_id_value)
+        var texture := V07Assets.texture_for(resource_id)
+        if texture == null or not resource_targets.has(resource_id):
+            resources_use_assets = false
+            continue
+        resource_rects[resource_id] = _fit_rect(texture.get_size(), resource_targets[resource_id])
+
     _v07_metrics = {
-        "v07_major_asset_count": surface_asset_count + station_count + 1 + resource_count,
+        "v07_major_asset_count": surface_asset_count + station_count + 1 + resource_ids.size(),
         "v07_station_count": station_count,
         "v07_elevator_inside_shaft": elevator_inside,
-        "v07_resource_identity_ok": resource_count >= 3 and all_assets_available,
+        "v07_resource_identity_ok": resource_ids.size() >= 3 and resources_use_assets,
         "v07_surface_assets_in_bounds": surface_bounds_ok,
         "v07_asset_aspect_ok": aspect_ok,
         "v07_crystal_visible": depth >= 90,
-        "v07_resource_installation_count": resource_count,
+        "v07_resource_installation_count": resource_ids.size(),
         "v07_surface_asset_count": surface_asset_count,
         "v07_surface_uses_assets": surface_asset_count > 0 and all_assets_available,
         "v07_shaft_uses_assets": station_count > 0 and V07Assets.has_asset("shaft_station") and V07Assets.has_asset("shaft_elevator"),
         "v07_elevator_rect": elevator_rect,
         "v07_shaft_rect": shaft_rect,
+        "v07_resource_asset_ids": resource_ids,
+        "v07_resource_asset_count": resource_ids.size(),
+        "v07_crystal_asset_drawn": depth >= 90,
+        "v07_resources_use_assets": resources_use_assets,
+        "v07_resource_rects": resource_rects,
     }
 
 func _fit_rect(source_size: Vector2, target: Rect2) -> Rect2:
@@ -186,6 +203,84 @@ func _draw_surface_base() -> void:
     if modules.has("antenna") and not narrow:
         _draw_antenna(size.x * 0.74, ground_y)
     _draw_surface_lights(ground_y, mini(int(profile.get("light_count", 4)), 6 if not narrow else 4))
+
+func _resource_asset_ids(depth: int) -> Array:
+    var ids: Array = SHALLOW_RESOURCE_ASSETS.duplicate()
+    if depth >= 90:
+        ids.append("crystal_installation")
+    return ids
+
+func _resource_v07_rects(viewport_size: Vector2, depth: int, narrow: bool) -> Dictionary:
+    var shallow_y := _depth_to_y(12.0)
+    var rects: Dictionary = {}
+    if narrow:
+        rects["iron_installation"] = Rect2(8.0, shallow_y - 70.0, 220.0, 118.0)
+        rects["coal_installation"] = Rect2(38.0, shallow_y + 35.0, 230.0, 120.0)
+        rects["copper_installation"] = Rect2(viewport_size.x - 238.0, shallow_y - 25.0, 228.0, 118.0)
+        if depth >= 90:
+            var crystal_y_narrow := _depth_to_y(90.0)
+            rects["crystal_installation"] = Rect2(viewport_size.x - 305.0, crystal_y_narrow - 78.0, 290.0, 156.0)
+    else:
+        rects["iron_installation"] = Rect2(12.0, shallow_y - 82.0, 305.0, 162.0)
+        rects["coal_installation"] = Rect2(308.0, shallow_y - 76.0, 260.0, 150.0)
+        rects["copper_installation"] = Rect2(viewport_size.x - 340.0, shallow_y - 84.0, 320.0, 166.0)
+        if depth >= 90:
+            var crystal_y := _depth_to_y(90.0)
+            rects["crystal_installation"] = Rect2(viewport_size.x * 0.77 - 210.0, crystal_y - 105.0, 420.0, 210.0)
+    return rects
+
+func _draw_resource_installations() -> void:
+    var depth := int(_state.get("depth", 0))
+    var viewport_size: Vector2 = _state.get("viewport_size", size)
+    if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+        viewport_size = size
+    var rects := _resource_v07_rects(viewport_size, depth, size.x < 800.0)
+
+    for asset_id in SHALLOW_RESOURCE_ASSETS:
+        if not rects.has(asset_id):
+            continue
+        var target: Rect2 = rects[asset_id]
+        if target.end.y < -170.0 or target.position.y > size.y + 170.0:
+            continue
+        _draw_resource_cavity(target, asset_id)
+        var actual := _draw_v07_asset(asset_id, target)
+        _draw_resource_foreground(actual, asset_id)
+
+    if depth >= 90 and rects.has("crystal_installation"):
+        var crystal_target: Rect2 = rects["crystal_installation"]
+        if crystal_target.end.y >= -180.0 and crystal_target.position.y <= size.y + 180.0:
+            var center := crystal_target.get_center()
+            draw_circle(center, minf(crystal_target.size.x, crystal_target.size.y) * 0.62, Color(0.13, 0.78, 0.82, 0.055))
+            draw_circle(center, minf(crystal_target.size.x, crystal_target.size.y) * 0.38, Color(0.16, 0.88, 0.90, 0.045))
+            _draw_resource_cavity(crystal_target, "crystal_installation")
+            var actual_crystal := _draw_v07_asset("crystal_installation", crystal_target)
+            _draw_resource_foreground(actual_crystal, "crystal_installation")
+
+func _draw_resource_cavity(target: Rect2, asset_id: String) -> void:
+    var pad_x := target.size.x * 0.07
+    var pad_y := target.size.y * 0.14
+    var cavity := Rect2(target.position - Vector2(pad_x, pad_y), target.size + Vector2(pad_x * 2.0, pad_y * 2.0))
+    var cavity_color := Color(0.025, 0.045, 0.052, 0.96)
+    if asset_id == "coal_installation":
+        cavity_color = Color(0.022, 0.028, 0.030, 0.98)
+    elif asset_id == "copper_installation":
+        cavity_color = Color(0.045, 0.055, 0.050, 0.97)
+    elif asset_id == "crystal_installation":
+        cavity_color = Color(0.025, 0.060, 0.070, 0.98)
+    draw_rect(cavity, cavity_color)
+    draw_line(Vector2(cavity.position.x, cavity.position.y + 8.0), Vector2(cavity.end.x, cavity.position.y + 2.0), Color(0.34, 0.35, 0.32, 0.38), 5.0)
+    draw_line(Vector2(cavity.position.x, cavity.end.y - 3.0), Vector2(cavity.end.x, cavity.end.y - 9.0), Color(0.22, 0.24, 0.23, 0.52), 6.0)
+
+func _draw_resource_foreground(actual: Rect2, asset_id: String) -> void:
+    if actual.size.x <= 0.0:
+        return
+    var rock := Color(0.055, 0.075, 0.078, 0.96)
+    if asset_id == "crystal_installation":
+        rock = Color(0.035, 0.080, 0.086, 0.94)
+    var radius := maxf(13.0, actual.size.y * 0.13)
+    draw_circle(Vector2(actual.position.x + radius * 0.55, actual.end.y - radius * 0.25), radius, rock)
+    draw_circle(Vector2(actual.end.x - radius * 0.45, actual.end.y - radius * 0.20), radius * 0.85, rock)
+    draw_line(Vector2(actual.position.x + actual.size.x * 0.10, actual.end.y - 3.0), Vector2(actual.end.x - actual.size.x * 0.08, actual.end.y - 5.0), Color(0.31, 0.29, 0.25, 0.45), 4.0)
 
 func _shaft_v07_rect(viewport_size: Vector2, depth: int) -> Rect2:
     if depth <= 0:
