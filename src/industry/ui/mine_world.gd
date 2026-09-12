@@ -17,6 +17,7 @@ var zoom := 1.0
 var scroll_depth := 0.0
 var velocity := 0.0
 var animation_phase := 0.0
+var use_asset_layout := false
 var deep_zone_visible := false
 
 var session
@@ -53,7 +54,7 @@ func bind_session(value) -> void:
     refresh()
 
 func focus_depth(target_depth: int) -> void:
-    var visible_span := maxf(20.0, (size.y - SURFACE_Y) / maxf(PIXELS_PER_METER * zoom, 0.01))
+    var visible_span := maxf(20.0, (size.y - _surface_origin()) / maxf(PIXELS_PER_METER * zoom, 0.01))
     scroll_depth = clampf(float(target_depth) - visible_span * 0.42, 0.0, _max_scroll_depth())
     velocity = 0.0
     refresh()
@@ -308,6 +309,7 @@ func _sync_crystal_activity() -> void:
 func _update_decor_positions() -> void:
     if _decor_root == null or session == null:
         return
+    _decor_root.visible = not (use_asset_layout and size.x < 800.0)
 
     var shaft_x := size.x * 0.5
     var surface_y := _depth_to_y(0.0)
@@ -390,6 +392,11 @@ func _rect_near_view(position_value: Vector2, dimensions: Vector2) -> bool:
     return position_value.x + dimensions.x >= -8.0 and position_value.x <= size.x + 8.0 and position_value.y + dimensions.y >= -20.0 and position_value.y <= size.y + 20.0
 
 func _rebuild_targets() -> void:
+    # Production emits changed every frame. Keep input ownership until release
+    # so a real tap is not lost when its Button is freed between the two events.
+    for target in _targets:
+        if is_instance_valid(target) and target is Button and target.is_pressed():
+            return
     for target in _targets:
         if is_instance_valid(target):
             target.free()
@@ -484,7 +491,10 @@ func _emit_selection(kind: String, id: String) -> void:
     selection_changed.emit(kind, id)
 
 func _depth_to_y(depth_value: float) -> float:
-    return SURFACE_Y + (depth_value - scroll_depth) * PIXELS_PER_METER * zoom
+    return _surface_origin() + (depth_value - scroll_depth) * PIXELS_PER_METER * zoom
+
+func _surface_origin() -> float:
+    return 200.0 if use_asset_layout and size.x < 800.0 else SURFACE_Y
 
 func _max_scroll_depth() -> float:
     var deepest := 180.0

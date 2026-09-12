@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/portrait-v0.8
+      - feature/portrait-polish-v0.8.1
   pull_request:
     branches:
       - main
@@ -41,6 +42,15 @@ jobs:
           status=${PIPESTATUS[0]}
           if [[ $status -ne 0 ]]; then exit "$status"; fi
           if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-v08-portrait.log; then exit 1; fi
+
+      - name: Verify final art direction and pointer alignment
+        shell: bash
+        run: |
+          set +e
+          timeout 90s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s res://tests/test_final_art_direction.gd 2>&1 | tee godot-final-art.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then exit "$status"; fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-final-art.log; then exit 1; fi
 
       - name: Upload portrait screenshots
         uses: actions/upload-artifact@v7.0.1

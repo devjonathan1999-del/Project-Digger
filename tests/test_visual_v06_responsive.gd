@@ -81,7 +81,8 @@ func _run() -> void:
         context.clear_selection()
         await _settle()
     if presenter != null:
-        t.check(float(presenter.marker_alpha("iron")) < 0.5, "marqueur revient au repos après fermeture")
+        t.check(not presenter.marker_is_emphasized("iron"), "marqueur revient au repos après fermeture")
+        t.check(float(presenter.marker_alpha("iron")) >= 0.75, "marqueur portrait reste lisible au repos")
 
     screen.queue_free()
     await process_frame

@@ -83,10 +83,15 @@ func _sync_module_renderer() -> void:
     if session_value == null:
         return
     var game = session_value.game
+    var mine_rates: Dictionary = {}
+    if game.has_method("mine_rate"):
+        for id in ["iron", "coal", "copper"]:
+            mine_rates[id] = game.mine_rate(id)
     _module_renderer.set_scene_state({
         "depth": game.depth,
         "center_level": game.center_level,
         "mine_levels": game.mine_levels.duplicate(true),
+        "mine_rates": mine_rates,
         "discoveries": game.discoveries.duplicate(true),
         "permanent_sites": game.permanent_sites.duplicate(true),
         "jobs": game.jobs.duplicate(true),
@@ -110,6 +115,7 @@ func _sync() -> void:
             continue
         seen[key] = true
         _style_target(target)
+        _align_portrait_resource(target)
         _sync_label(key, _label_for_target(target), target)
 
     var existing := _labels.keys()
@@ -137,6 +143,51 @@ func _style_target(target: Button) -> void:
     target.text = ""
     target.modulate = Color(1.0, 1.0, 1.0, 0.035)
     target.focus_mode = Control.FOCUS_ALL
+
+func _align_portrait_resource(target: Button) -> void:
+    target.set_meta("final_crystal_art", false)
+    if _world.size.x < NARROW_BREAKPOINT and _module_renderer != null and _module_renderer.has_method("final_crystal_binding"):
+        var binding: Dictionary = _module_renderer.final_crystal_binding()
+        if not binding.is_empty():
+            var suffix := str(binding["id"]).replace(":", "_")
+            if str(target.name) in ["Discovery_" + suffix, "Site_" + suffix]:
+                target.set_meta("final_crystal_art", true)
+                if binding["kind"] == "site" and str(target.name).begins_with("Discovery_"):
+                    target.visible = false
+                    return
+                var rects: Dictionary = _module_renderer._resource_v07_rects(_world.size, int(_world.get("session").game.depth), true)
+                if rects.has("crystal_installation"):
+                    var crystal_rect: Rect2 = rects["crystal_installation"]
+                    target.custom_minimum_size = Vector2(44.0, 44.0)
+                    target.position = crystal_rect.position
+                    target.size = crystal_rect.size
+                    target.visible = _module_renderer._shallow_resource_visible(crystal_rect, true)
+                    return
+    if _world.size.x < NARROW_BREAKPOINT and target.name == "Drill" and _module_renderer != null and _module_renderer.has_method("final_drill_rect"):
+        var drill_rect: Rect2 = _module_renderer.final_drill_rect()
+        target.custom_minimum_size = Vector2(44.0, 44.0)
+        target.position = drill_rect.position
+        target.size = drill_rect.size
+        target.visible = drill_rect.end.y >= 0.0 and drill_rect.position.y < _world.size.y
+        return
+    if _world.size.x >= NARROW_BREAKPOINT or not target.name.begins_with("Mine_"):
+        return
+    if _module_renderer == null or not _module_renderer.has_method("_resource_v07_rects"):
+        return
+    var session_value = _world.get("session")
+    if session_value == null:
+        return
+    var resource_id := str(target.name).trim_prefix("Mine_")
+    var rects: Dictionary = _module_renderer._resource_v07_rects(_world.size, session_value.game.depth, true)
+    var asset_id := resource_id + "_installation"
+    if not rects.has(asset_id):
+        return
+    var asset_rect: Rect2 = rects[asset_id]
+    target.position = asset_rect.position
+    target.size = asset_rect.size
+    target.visible = _module_renderer._shallow_resource_visible(asset_rect, true)
+    var install_depth: int = {"iron": 22, "coal": 50, "copper": 78}.get(resource_id, 0)
+    target.set_meta("portrait_initial_network", session_value.game.depth < install_depth)
 
 func _release_world_focus() -> void:
     if _world == null or not is_instance_valid(_world) or get_viewport() == null:
@@ -171,12 +222,24 @@ func _sync_label(key: String, text: String, target: Button) -> void:
     var emphasized := key == _selected_key or target.has_focus() or (hover_enabled and target.is_hovered())
     label.set_meta("emphasized", emphasized)
     label.text = text if emphasized else "· " + text
+    if bool(target.get_meta("portrait_initial_network", false)):
+        label.text = text + " · réseau initial"
     label.visible = target.visible
-    label.size = Vector2(maxf(78.0, target.size.x), 20.0)
-    label.position = Vector2(target.position.x + target.size.x * 0.5 - label.size.x * 0.5, target.position.y - 20.0)
-    label.add_theme_font_size_override("font_size", 12 if emphasized else 10)
-    label.modulate = Color(1.0, 1.0, 1.0, EMPHASIZED_ALPHA if emphasized else REST_ALPHA)
+    var portrait := not hover_enabled
+    var label_height := 26.0 if portrait else 20.0
+    label.size = Vector2(maxf(78.0, target.size.x), label_height)
+    label.position = Vector2(target.position.x + target.size.x * 0.5 - label.size.x * 0.5, target.position.y - label_height)
+    label.add_theme_font_size_override("font_size", 14 if portrait else (12 if emphasized else 10))
+    label.modulate = Color(1.0, 1.0, 1.0, EMPHASIZED_ALPHA if emphasized else (0.90 if portrait else REST_ALPHA))
     label.add_theme_color_override("font_color", _color_for_key(key, emphasized))
+    if portrait and _module_renderer != null and _module_renderer.has_method("uses_final_portrait"):
+        if key in ["iron", "coal", "copper", "Drill"] or bool(target.get_meta("final_crystal_art", false)):
+            label.visible = false # Identity plates are drawn inside the scene.
+        elif key.begins_with("Discovery_") and not emphasized:
+            label.text = "◆"
+            label.size = Vector2(32.0, 26.0)
+            label.position = target.position + Vector2(target.size.x * 0.5 - 16.0, -12.0)
+            label.add_theme_font_size_override("font_size", 16)
 
 func _color_for_key(key: String, emphasized: bool) -> Color:
     var color := Style.MUTED

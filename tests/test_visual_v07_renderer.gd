@@ -157,11 +157,14 @@ func _init() -> void:
         failures += 1
     else:
         renderer.size = Vector2(720, 1000)
-        if renderer._shallow_resource_visible(Rect2(10.0, 90.0, 220.0, 118.0), true):
-            push_error("mobile shallow installation overlapping the depth controls must be hidden")
+        if renderer._shallow_resource_visible(Rect2(10.0, 12.0, 220.0, 118.0), true):
+            push_error("mobile shallow installation clipping its identity label must be hidden")
             failures += 1
         if not renderer._shallow_resource_visible(Rect2(10.0, 180.0, 220.0, 118.0), true):
             push_error("mobile shallow installation below the depth controls must remain visible")
+            failures += 1
+        if not renderer._shallow_resource_visible(Rect2(10.0, 90.0, 220.0, 118.0), true):
+            push_error("portrait installation must remain visible below the external shortcut strip")
             failures += 1
         if not renderer._shallow_resource_visible(Rect2(10.0, 90.0, 220.0, 118.0), false):
             push_error("desktop shallow installation visibility must remain unchanged")

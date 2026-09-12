@@ -3,6 +3,7 @@ extends Control
 
 const Catalog = preload("res://src/industry/industry_catalog.gd")
 const Style = preload("res://src/industry/ui/industry_theme.gd")
+const Icons = preload("res://src/industry/ui/industry_icons.gd")
 const MineWorldScript = preload("res://src/industry/ui/mine_world.gd")
 const MineSceneRendererScript = preload("res://src/industry/ui/mine_asset_renderer.gd")
 const MineInteractionPresenterScript = preload("res://src/industry/ui/mine_interaction_presenter.gd")
@@ -147,39 +148,58 @@ func _build_compact_hud(parent: Node) -> void:
     _compact_hud.add_theme_constant_override("v_separation", 4)
     parent.add_child(_compact_hud)
 
-    var title_chip := _hud_panel(_compact_hud, 86)
-    var title := _label(title_chip, "DIGGER", 16, Style.TEXT)
+    var title_chip := _hud_panel(_compact_hud, 0)
+    var title_box := VBoxContainer.new()
+    title_box.add_theme_constant_override("separation", 0)
+    title_chip.add_child(title_box)
+    var title := _label(title_box, "DIGGER", 17, Style.TEXT)
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    var tagline := _label(title_box, "EXTRAIRE · BÂTIR", 8, Style.MUTED)
+    tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
     for id in Catalog.RESOURCES:
-        var chip := _hud_panel(_compact_hud, 84)
+        var chip := _hud_panel(_compact_hud, 0)
         var row := HBoxContainer.new()
-        row.add_theme_constant_override("separation", 4)
+        row.add_theme_constant_override("separation", 5)
         chip.add_child(row)
+        var icon := TextureRect.new()
+        icon.texture = Icons.texture(id)
+        icon.custom_minimum_size = Vector2(24, 24)
+        icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        row.add_child(icon)
+        var values := VBoxContainer.new()
+        values.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+        values.add_theme_constant_override("separation", 0)
+        row.add_child(values)
         var short_label := str(HUD_RESOURCE_LABELS.get(id, Catalog.RESOURCES[id]["label"]))
-        var caption := _label(row, short_label, 10, Style.MUTED)
-        caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-        var number := _label(row, "0", 15, Style.ACCENT if Catalog.RESOURCES[id]["raw"] else Style.COPPER)
+        var caption := _label(values, short_label, 11, Style.MUTED)
+        caption.autowrap_mode = TextServer.AUTOWRAP_OFF
+        caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+        var number := _label(values, "0", 17, Style.CRYSTAL_CYAN if Catalog.RESOURCES[id]["raw"] else Style.COPPER)
         number.name = "Stock_" + id
-        number.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+        number.autowrap_mode = TextServer.AUTOWRAP_OFF
+        number.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+        chip.tooltip_text = str(Catalog.RESOURCES[id]["label"])
         _wallet[id] = number
 
-    var capacity_chip := _hud_panel(_compact_hud, 108)
-    _capacity = _label(capacity_chip, "Capacité 0/0", 11, Style.MUTED)
+    var capacity_chip := _hud_panel(_compact_hud, 0)
+    _capacity = _label(capacity_chip, "Capacité\n0/0", 12, Style.MUTED)
     _capacity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     _capacity.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
-    var depth_chip := _hud_panel(_compact_hud, 82)
-    _depth = _label(depth_chip, "−0 m", 18, Style.COPPER)
+    var depth_chip := _hud_panel(_compact_hud, 0)
+    depth_chip.add_theme_stylebox_override("panel", Style.panel(Color("1b2832"), Color("7a6545"), 5))
+    _depth = _label(depth_chip, "−0 m", 21, Style.COPPER)
     _depth.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     _depth.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 
 func _hud_panel(parent: Node, min_width: float) -> PanelContainer:
     var panel := PanelContainer.new()
-    panel.custom_minimum_size = Vector2(min_width, 36)
+    panel.custom_minimum_size = Vector2(min_width, 50)
     panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    panel.add_theme_stylebox_override("panel", Style.panel(Color("111d29"), Color("283d4b"), 5))
+    panel.add_theme_stylebox_override("panel", Style.panel(Color("101c25"), Color("354e5d"), 5))
     parent.add_child(panel)
     return panel
 
@@ -205,6 +225,7 @@ func _build_mine_panel() -> void:
     world_card.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
     _mine_world = MineWorldScript.new()
+    _mine_world.use_asset_layout = true
     world_card.add_child(_mine_world)
     _mine_world.bind_session(session)
     _mine_world.selection_changed.connect(_on_world_selection)
@@ -258,8 +279,10 @@ func _build_alert_stack(parent: Control) -> void:
     _alert_stack.name = "MineAlertStack"
     _alert_stack.position = Vector2(12, 58)
     _alert_stack.custom_minimum_size.x = 440
-    _alert_stack.mouse_filter = Control.MOUSE_FILTER_PASS
+    _alert_stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
     _alert_stack.add_theme_constant_override("separation", 6)
+    _alert_stack.resized.connect(_position_alert_stack)
+    _mine_panel.resized.connect(_position_alert_stack)
     parent.add_child(_alert_stack)
     _build_event_banner(_alert_stack)
     _build_offline_card(_alert_stack)
@@ -292,12 +315,18 @@ func _build_offline_card(parent: Node) -> void:
     _offline = _label(row, "", 12, Style.ACCENT)
     _offline.name = "OfflineNotice"
     var close := _compact_button(row, "×", "OfflineClose")
-    close.custom_minimum_size = Vector2(32, 32)
+    close.custom_minimum_size = Vector2(44, 44)
     close.pressed.connect(_dismiss_offline)
 
 func _add_tab(parent: Node, title: String, node_name: String, view_id: String) -> void:
     var button := _button(parent, title, node_name)
-    button.custom_minimum_size.y = 40
+    button.custom_minimum_size.y = 48
+    button.icon = Icons.texture(view_id)
+    button.expand_icon = true
+    button.add_theme_constant_override("icon_max_width", 26)
+    button.add_theme_constant_override("h_separation", 8)
+    button.clip_text = true
+    button.add_theme_font_size_override("font_size", 15)
     button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     button.pressed.connect(_select_view.bind(view_id))
     _tabs[view_id] = button
@@ -312,6 +341,10 @@ func _select_view(view_id: String) -> void:
     _technology_panel.visible = view_id == "technology"
     for id in _tabs:
         _tabs[id].disabled = id == view_id
+        if id == view_id:
+            _tabs[id].add_theme_stylebox_override("disabled", Style.panel(Color("554027"), Style.ACCENT, 10))
+            _tabs[id].add_theme_color_override("font_disabled_color", Style.COPPER)
+            _tabs[id].add_theme_color_override("icon_disabled_color", Style.COPPER)
     if view_id == "mine":
         _mine_world.refresh()
     elif view_id == "industry":
@@ -326,7 +359,7 @@ func _refresh() -> void:
         return
     var game = session.game
     _depth.text = "−%d m" % game.depth
-    _capacity.text = "Capacité %d/%d" % [game.used_capacity(), game.total_capacity()]
+    _capacity.text = "Capacité\n%d/%d" % [game.used_capacity(), game.total_capacity()]
     for id in _wallet:
         _wallet[id].text = str(floori(game.resources[id]))
     _refresh_milestone_buttons()
@@ -338,6 +371,7 @@ func _refresh() -> void:
     _technology_panel.refresh()
     _refresh_event_banner()
     _refresh_offline_card()
+    _position_alert_stack.call_deferred()
 
 func _refresh_milestone_buttons() -> void:
     for milestone in _milestone_buttons:
@@ -430,18 +464,39 @@ func _responsive() -> void:
     _compact_hud.columns = 5 if narrow else 10
     if _mine_panel != null:
         _mine_panel.custom_minimum_size.y = 860.0 if portrait else 540.0
+        var world_card := _mine_panel.find_child("MineWorldCard", true, false) as Control
+        if world_card != null:
+            world_card.offset_top = 68.0 if portrait else 0.0
+        _mine_world.refresh()
+        var shortcuts := _mine_panel.find_child("MineCameraShortcuts", true, false) as Control
+        if shortcuts != null:
+            shortcuts.custom_minimum_size.x = minf(520.0, maxf(360.0, size.x - 48.0))
+            for shortcut in shortcuts.get_children():
+                if shortcut is Button:
+                    shortcut.custom_minimum_size.y = 44.0 if portrait else 32.0
+                    shortcut.custom_minimum_size.x = 44.0 if portrait and size.x < 600.0 else 62.0
     if _bottom_navigation != null:
         _bottom_navigation.custom_minimum_size.y = 52.0 if portrait else 44.0
     for tab in _tabs.values():
         var tab_button := tab as Button
-        tab_button.custom_minimum_size.y = 48.0 if portrait else 40.0
+        tab_button.custom_minimum_size.y = 48.0 if portrait else 44.0
+        tab_button.add_theme_font_size_override("font_size", 12 if size.x < 600.0 else 15)
+        tab_button.add_theme_constant_override("icon_max_width", 20 if size.x < 600.0 else 26)
     if _site_panel != null:
         _site_panel.set_layout_mode("bottom_sheet" if narrow else "floating_right")
     if _alert_stack != null:
         _alert_stack.custom_minimum_size.x = 0 if narrow else 440
         _alert_stack.size.x = minf(440.0, maxf(300.0, size.x - 72.0))
+        _position_alert_stack()
     if _industry_panel != null:
         _industry_panel._responsive()
+
+func _position_alert_stack() -> void:
+    if _alert_stack == null or _mine_panel == null:
+        return
+    var stack_height := _alert_stack.get_combined_minimum_size().y
+    _alert_stack.size.y = stack_height
+    _alert_stack.position.y = maxf(74.0, _mine_panel.size.y - stack_height - 12.0) if size.y > size.x else 58.0
 
 func _cost(cost: Dictionary, multiplier: int = 1) -> String:
     var parts := PackedStringArray()
