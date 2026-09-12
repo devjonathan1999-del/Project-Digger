@@ -5,6 +5,7 @@ const PAYLOAD_PARTS := [
     "res://assets/industry/v07/payload/part01.b64",
     "res://assets/industry/v07/payload/part02.b64",
     "res://assets/industry/v07/payload/part03.b64",
+    "res://assets/industry/v07/payload/part03b.b64",
     "res://assets/industry/v07/payload/part04.b64",
     "res://assets/industry/v07/payload/part05.b64",
 ]
