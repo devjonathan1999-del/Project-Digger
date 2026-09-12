@@ -53,6 +53,16 @@ func _process(_delta: float) -> void:
 func _ensure_module_renderer() -> void:
     if _world == null or not is_instance_valid(_world):
         return
+
+    # v0.7 owns the visual composition when IndustryScreen has installed it.
+    # Reusing it here prevents the former v0.6 renderer from being inserted
+    # above the new raster assets while preserving the legacy fallback for
+    # isolated presenter tests and older scenes.
+    var asset_renderer := _world.find_child("MineAssetRenderer", false, false)
+    if asset_renderer != null:
+        _module_renderer = asset_renderer as Control
+        return
+
     var existing := _world.find_child("MineModuleRenderer", false, false)
     if existing != null:
         _module_renderer = existing as Control

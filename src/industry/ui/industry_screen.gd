@@ -4,7 +4,7 @@ extends Control
 const Catalog = preload("res://src/industry/industry_catalog.gd")
 const Style = preload("res://src/industry/ui/industry_theme.gd")
 const MineWorldScript = preload("res://src/industry/ui/mine_world.gd")
-const MineSceneRendererScript = preload("res://src/industry/ui/mine_scene_renderer.gd")
+const MineSceneRendererScript = preload("res://src/industry/ui/mine_asset_renderer.gd")
 const MineInteractionPresenterScript = preload("res://src/industry/ui/mine_interaction_presenter.gd")
 const SitePanelScript = preload("res://src/industry/ui/site_panel.gd")
 const IndustryPanelScript = preload("res://src/industry/ui/industry_panel.gd")
@@ -217,7 +217,6 @@ func _build_mine_panel() -> void:
     _interaction_presenter = MineInteractionPresenterScript.new()
     _mine_world.add_child(_interaction_presenter)
     _interaction_presenter.bind(_mine_world)
-
     _overlay_layer = Control.new()
     _overlay_layer.name = "MineOverlayLayer"
     _overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE

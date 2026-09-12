@@ -28,6 +28,8 @@ func _run() -> void:
 
     var world = screen.find_child("MineWorld", true, false)
     var module = screen.find_child("MineModuleRenderer", true, false)
+    if module == null:
+        module = screen.find_child("MineAssetRenderer", true, false)
     var context = screen.find_child("ContextPanel", true, false)
     var presenter = screen.find_child("MineInteractionPresenter", true, false)
     t.check(world != null, "MineWorld responsive présent")
