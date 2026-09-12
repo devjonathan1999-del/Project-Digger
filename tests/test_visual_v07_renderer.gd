@@ -21,7 +21,7 @@ class FakeWorld:
     var zoom: float = 1.0
     var animation_phase: float = 0.35
 
-func _state() -> Dictionary:
+func _state(scroll_depth_value: float = 55.0) -> Dictionary:
     return {
         "depth": 150,
         "center_level": 6,
@@ -29,7 +29,7 @@ func _state() -> Dictionary:
         "discoveries": {},
         "permanent_sites": [],
         "jobs": {},
-        "scroll_depth": 55.0,
+        "scroll_depth": scroll_depth_value,
         "zoom": 1.0,
         "animation_phase": 0.35,
         "viewport_size": Vector2(1280, 800),
@@ -80,6 +80,52 @@ func _init() -> void:
             if not metrics.has(key):
                 push_error("missing v0.7 visual metric: %s" % key)
                 failures += 1
+
+    # Task 3: surface + shaft must be composed from the v0.7 raster assets.
+    renderer.set_scene_state(_state(0.0))
+    var surface_metrics: Dictionary = renderer.visual_metrics()
+    for key in [
+        "v07_surface_asset_count",
+        "v07_surface_uses_assets",
+        "v07_shaft_uses_assets",
+        "v07_elevator_rect",
+        "v07_shaft_rect",
+    ]:
+        if not surface_metrics.has(key):
+            push_error("missing v0.7 surface/shaft metric: %s" % key)
+            failures += 1
+    if int(surface_metrics.get("v07_surface_asset_count", 0)) < 4:
+        push_error("desktop Centre 6 must expose four illustrated surface assets")
+        failures += 1
+    if not bool(surface_metrics.get("v07_surface_uses_assets", false)):
+        push_error("surface must use v0.7 raster assets")
+        failures += 1
+    if not bool(surface_metrics.get("v07_shaft_uses_assets", false)):
+        push_error("shaft stations/elevator must use v0.7 raster assets")
+        failures += 1
+    if int(surface_metrics.get("v07_station_count", 0)) != 5:
+        push_error("depth 150 must expose five illustrated shaft stations")
+        failures += 1
+
+    if not renderer.has_method("_fit_rect"):
+        push_error("MineAssetRenderer must preserve source aspect ratio with _fit_rect")
+        failures += 1
+    else:
+        var fitted: Rect2 = renderer._fit_rect(Vector2(128.0, 96.0), Rect2(0.0, 0.0, 330.0, 120.0))
+        var source_ratio := 128.0 / 96.0
+        var fitted_ratio := fitted.size.x / fitted.size.y
+        if absf(source_ratio - fitted_ratio) > 0.001:
+            push_error("v0.7 asset fitting changed source aspect ratio")
+            failures += 1
+
+    var elevator_rect: Rect2 = surface_metrics.get("v07_elevator_rect", Rect2())
+    var shaft_rect: Rect2 = surface_metrics.get("v07_shaft_rect", Rect2())
+    if elevator_rect.size.x <= 0.0 or shaft_rect.size.x <= 0.0:
+        push_error("shaft/elevator layout rects must be measurable")
+        failures += 1
+    elif elevator_rect.position.x < shaft_rect.position.x or elevator_rect.end.x > shaft_rect.end.x:
+        push_error("illustrated elevator must stay inside shaft bounds")
+        failures += 1
 
     renderer.free()
     world.free()
