@@ -32,7 +32,7 @@ Parcours UI réel avec rendu OpenGL sous Xvfb :
 xvfb-run -a godot --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_industry_ui.gd -- --screenshots /tmp/digger-ui
 ```
 
-La CI ajoute également des parcours dédiés aux actions contextuelles, au **Filon instable**, aux états visuels modulaires et aux présentations v0.4/v0.5. Le runner renvoie `0` si toutes les assertions passent et `1` sinon.
+La CI ajoute également des parcours dédiés aux actions contextuelles, au **Filon instable**, aux états visuels modulaires et aux présentations v0.4/v0.5/v0.6. Le runner renvoie `0` si toutes les assertions passent et `1` sinon.
 
 ## Boucle industrielle
 
@@ -130,6 +130,20 @@ La v0.5 approfondit la scène Mine sans modifier la boucle économique, les coû
 
 Les captures CI v0.5 couvrent quatre états déterministes : **1280×800 à 60 m**, **1280×800 à 150 m**, **720×1000 à 90 m** et **1280×800 avec une découverte profonde sélectionnée**.
 
+## Final graphics v0.6
+
+La v0.6 transforme la Mine en une composition hybride proche de la cible graphique finale, toujours sans modifier le gameplay, les coûts, les débits, la progression, les timers, les événements ni le schéma de sauvegarde.
+
+- `MineModuleRenderer` dessine la masse rocheuse, les grandes cavités, les bassins de lumière et les installations industrielles reconnaissables ; `MineFinalModuleRenderer` adapte la même scène aux écrans étroits sans changer les hitboxes.
+- Le puits central devient un module héro : structure acier plus large, ascenseur, câbles, rails, contrepoids, conduites et stations aux horizons débloqués.
+- La surface est reconstruite comme une vraie base minière avec atelier, silo, chevalement, centre de contrôle, ventilation, réseaux techniques et équipements progressifs du Centre.
+- Fer, Charbon, Cuivre et Cristal possèdent des silhouettes et accessoires propres afin d’être identifiables sans dépendre des étiquettes.
+- Les ressources graphiques réutilisables sont locales dans `assets/industry/v06/`. Le rendu garde des fallbacks procéduraux et ne dépend d’aucun service réseau à l’exécution.
+- La géologie gagne une masse opaque irrégulière, des strates, blocs, fissures, grandes cavités, poussières/vapeur et une progression lumineuse ambre → cyan localisée en profondeur.
+- Les cibles tactiles restent autoritatives et atteignent au moins 44 px. Sur écran étroit, les détails tertiaires sont réduits mais les identités de ressources et le panneau contextuel en bottom-sheet restent utilisables.
+
+Les cinq captures CI v0.6 sont déterministes : **surface 1280×800**, **60 m 1280×800**, **150 m 1280×800**, **sélection profonde 1280×800** et **90 m 720×1000**. Elles sont publiées dans l’artefact `industry-ui` avec les captures historiques v0.4/v0.5.
+
 ## Sauvegarde et progression hors ligne
 
 La sauvegarde industrielle reste :
@@ -171,9 +185,10 @@ La CI Godot 4.7.2 vérifie notamment :
 - profils déterministes et silhouettes de galeries v0.5 ;
 - enrichissement du puits, de la surface et de la géologie avec la profondeur ;
 - marqueurs contextuels v0.5 au repos, focus et sélection, y compris retour au repos à la fermeture du contexte ;
+- modules industriels, identités Fer/Charbon/Cuivre/Cristal, géologie finale et responsive v0.6 ;
 - zones tactiles invisibles mais réellement cliquables ;
 - absence de mutation économique par le rendu ;
-- captures wide/narrow v0.4 et quatre scénarios v0.5 publiés dans l’artefact `industry-ui`.
+- captures wide/narrow v0.4, quatre scénarios v0.5 et cinq scénarios v0.6 publiés dans l’artefact `industry-ui`.
 
 Les captures CI utilisent un vrai rendu OpenGL sous Xvfb. Aucun test Windows ou Android n’est revendiqué à ce stade.
 
@@ -210,6 +225,11 @@ Quand le corridor final est ouvert, le HUD affiche :
 `Accès aux profondeurs ouvert — Vertical slice terminé`
 
 ## Documentation
+
+### Final graphics v0.6
+
+- Design : `docs/superpowers/specs/2026-09-11-final-graphics-v0.6-design.md`
+- Plan : `docs/superpowers/plans/2026-09-11-final-graphics-v0.6.md`
 
 ### Profondeur visuelle v0.5
 
