@@ -7,6 +7,7 @@ const ModuleRenderer = preload("res://src/industry/ui/mine_final_module_renderer
 const REST_ALPHA := 0.24
 const EMPHASIZED_ALPHA := 1.0
 const MIN_TOUCH_HEIGHT := 44.0
+const NARROW_BREAKPOINT := 800.0
 
 var _world: Control
 var _labels: Dictionary = {}
@@ -156,7 +157,8 @@ func _sync_label(key: String, text: String, target: Button) -> void:
         add_child(label)
         _labels[key] = label
 
-    var emphasized := key == _selected_key or target.has_focus() or target.is_hovered()
+    var hover_enabled := _world.size.x >= NARROW_BREAKPOINT
+    var emphasized := key == _selected_key or target.has_focus() or (hover_enabled and target.is_hovered())
     label.set_meta("emphasized", emphasized)
     label.text = text if emphasized else "· " + text
     label.visible = target.visible
@@ -219,7 +221,7 @@ func _label_for_target(target: Button) -> String:
             return "Foreuse"
     if key.begins_with("Site_"):
         return "Site d'exploitation"
-    if key.begins_with("Discovery_"):
+    if key.begins_with("Discovery_\"):
         var raw := original_text.to_lower()
         if "anomal" in raw:
             return "Anomalie"
