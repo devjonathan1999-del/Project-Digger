@@ -151,6 +151,22 @@ func _init() -> void:
                 push_error("resource cavity must still frame the full illustrated installation")
                 failures += 1
 
+    # Mobile polish: shallow resource installations must not sit underneath the depth jump controls.
+    if not renderer.has_method("_shallow_resource_visible"):
+        push_error("renderer must expose shallow-resource visibility rules")
+        failures += 1
+    else:
+        renderer.size = Vector2(720, 1000)
+        if renderer._shallow_resource_visible(Rect2(10.0, 90.0, 220.0, 118.0), true):
+            push_error("mobile shallow installation overlapping the depth controls must be hidden")
+            failures += 1
+        if not renderer._shallow_resource_visible(Rect2(10.0, 180.0, 220.0, 118.0), true):
+            push_error("mobile shallow installation below the depth controls must remain visible")
+            failures += 1
+        if not renderer._shallow_resource_visible(Rect2(10.0, 90.0, 220.0, 118.0), false):
+            push_error("desktop shallow installation visibility must remain unchanged")
+            failures += 1
+
     renderer.free()
     world.free()
     quit(1 if failures > 0 else 0)
