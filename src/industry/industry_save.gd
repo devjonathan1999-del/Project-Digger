@@ -2,7 +2,7 @@ class_name IndustrySave
 extends RefCounted
 
 const IndustryGameScript = preload("res://src/industry/industry_game.gd")
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 const LEGACY_VERSION := 1
 const MAX_SAFE_SEED := 2147483646
 const DEFAULT_PATH := "user://industry_v1.json"
@@ -71,7 +71,8 @@ func load_game(path: String, now_unix: float) -> Dictionary:
         return _migrate_v1(payload, logical_now)
 
     var candidate = IndustryGameScript.new()
-    if not candidate.restore(payload["industry"]):
+    var restored: bool = candidate.restore_v2(payload["industry"]) if int(payload["version"]) == 2 else candidate.restore(payload["industry"])
+    if not restored:
         return _new_result(logical_now, "État industriel incohérent")
     return _finish_load(candidate, float(payload["saved_at_unix"]), logical_now)
 
@@ -124,7 +125,7 @@ func _valid_version(value: Variant) -> bool:
         return false
     if float(value) != floor(float(value)):
         return false
-    return int(value) in [LEGACY_VERSION, SAVE_VERSION]
+    return int(value) in [LEGACY_VERSION, 2, SAVE_VERSION]
 
 func _valid_timestamp(value: Variant) -> bool:
     return typeof(value) in [TYPE_INT, TYPE_FLOAT] and is_finite(float(value)) and float(value) >= 0.0

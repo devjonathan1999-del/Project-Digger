@@ -1,8 +1,17 @@
 extends RefCounted
 
 const Assets = preload("res://src/industry/ui/mine_final_assets.gd")
+const Economy = preload("res://src/industry/industry_catalog.gd")
 const STEEL := Color("56646b")
 const AMBER := Color("e8ad59")
+
+static func next_progression_caption(depth: int) -> String:
+    var gates: Array = Economy.GATES.keys()
+    gates.sort()
+    for gate in gates:
+        if int(gate) > depth:
+            return "Palier %d m" % int(gate)
+    return "Objectif atteint"
 
 static func draw_scene(host: Control, state: Dictionary, chambers: Dictionary) -> void:
     var depth := int(state.get("depth", 0))
@@ -154,7 +163,7 @@ static func _rig(host: Control, center: float, half: float, _ground: float, fron
     host.draw_style_box(_box(), plate)
     host.draw_string(ThemeDB.fallback_font, plate.position + Vector2(8.0, 18.0), "FOREUSE", HORIZONTAL_ALIGNMENT_CENTER, 100.0, 14, Color("e9e5d9"))
     var depth := int(state.get("depth", 0))
-    var caption := "Palier %d m" % ((depth / 30 + 1) * 30) if depth < 150 else "À explorer"
+    var caption := next_progression_caption(depth)
     host.draw_string(ThemeDB.fallback_font, plate.position + Vector2(8.0, 34.0), caption, HORIZONTAL_ALIGNMENT_CENTER, 100.0, 12, AMBER)
 
 static func _ruler(host: Control, x: float, state: Dictionary) -> void:

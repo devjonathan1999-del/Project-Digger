@@ -22,8 +22,8 @@ func run(t: TestSupport) -> void:
 
     _complete_drill(game, t, 10)
     _complete_drill(game, t, 20)
-    t.check(game.upgrade_drill(), "foreuse niveau 2 préparée avant 30 m")
     _complete_drill(game, t, 30)
+    t.check(game.upgrade_drill(), "tête I installée après déblocage à 30 m")
     t.equal(game.depth, 30, "palier 30 m atteint par forage")
     t.check(game.discoveries.has("30:0"), "découverte garantie 30 m détectée")
     t.equal(game.discoveries["30:0"]["type"], "rich_vein", "filon riche garanti à 30 m")
@@ -42,14 +42,13 @@ func run(t: TestSupport) -> void:
     t.equal(game.pending_events.size(), 1, "Filon instable obtenu naturellement après exploration")
 
     _complete_drill(game, t, 50)
-    t.check(game.upgrade_drill(), "foreuse niveau 3 préparée avant 60 m")
     _complete_drill(game, t, 60)
+    t.check(game.upgrade_drill(), "tête II installée après déblocage à 60 m")
     t.check(game.upgrade_center(), "Centre niveau 3 construit à 60 m")
     t.equal(game.center_level, 3, "Centre niveau 3 confirmé")
 
     _complete_drill(game, t, 70)
     _complete_drill(game, t, 80)
-    t.check(game.upgrade_drill(), "foreuse niveau 4 préparée avant 90 m")
     _complete_drill(game, t, 90)
     t.equal(game.tech_points, 1, "premier point technologique obtenu à 90 m")
     t.check(game.upgrade_center(), "Centre niveau 4 construit à 90 m")
@@ -74,7 +73,6 @@ func run(t: TestSupport) -> void:
 
     _complete_drill(game, t, 100)
     _complete_drill(game, t, 110)
-    t.check(game.upgrade_drill(), "foreuse niveau 5 préparée avant 120 m")
     _complete_drill(game, t, 120)
     t.check(game.upgrade_center(), "Centre niveau 5 construit à 120 m")
     t.equal(game.center_level, 5, "Centre niveau 5 confirmé")
@@ -161,6 +159,9 @@ func _equivalent_value(actual: Variant, expected: Variant) -> bool:
     return actual == expected
 
 func _fund(game) -> void:
+    # Fixture for discovery/event integration; real crafting is exercised by economy_route.
+    for resource_id in game.resources:
+        game.resources[resource_id] = 10000.0
     game.resources["iron"] = 10000.0
     game.resources["coal"] = 10000.0
     game.resources["copper"] = 10000.0

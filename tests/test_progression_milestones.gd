@@ -12,6 +12,7 @@ func test_milestone_completion_generates_discovery_once(t: TestSupport) -> void:
     var game = IndustryGameScript.new()
     game.depth = 20
     game.drill_level = 2
+    game.resources["mechanical_chassis"] = 1.0
     t.check(game.start_excavation(), "forage vers 30 m lancé")
     game.advance(game.jobs["drill"]["remaining"])
 

@@ -476,7 +476,10 @@ func _add_timer(node_name: String, job: Dictionary, center: Vector2) -> void:
 func _add_site_status(node_name: String, site: Dictionary, center: Vector2) -> void:
     var label := Label.new()
     label.name = node_name
-    label.text = "ACTIF · %.2f/min" % (float(site.get("rate", 0.0)) * 60.0)
+    if str(site.get("type", "")) == "ancient_structure":
+        label.text = "Récupération de fragments" if session.game.depth >= 1000 else "Récupération à 1000 m"
+    else:
+        label.text = "ACTIF · %.2f/min" % (float(site.get("rate", 0.0)) * 60.0)
     label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     label.add_theme_font_size_override("font_size", 11)
     label.add_theme_color_override("font_color", Style.CRYSTAL_CYAN)

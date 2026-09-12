@@ -1,11 +1,8 @@
-class_name IndustryGame
 extends RefCounted
 
-const Catalog = preload("res://src/industry/industry_catalog.gd")
-const Discovery = preload("res://src/industry/industry_discovery.gd")
-const FACILITIES: Array[String] = ["furnace", "workshop", "machining", "crystal_lab", "electronics", "chemistry", "drill", "recovery"]
-const LegacyGame = preload("res://src/industry/industry_legacy_game.gd")
-const LegacyCatalog = preload("res://src/industry/industry_legacy_catalog.gd")
+const Catalog = preload("res://src/industry/industry_legacy_catalog.gd")
+const Discovery = preload("res://src/industry/industry_legacy_discovery.gd")
+const FACILITIES: Array[String] = ["furnace", "workshop", "drill"]
 const V1_RESOURCE_IDS := ["iron", "coal", "copper", "iron_ingot", "copper_ingot", "cable"]
 const PRIORITY_BRANCHES := ["production", "logistics", "exploration"]
 const PRIORITY_COOLDOWN_SECONDS := 300.0
@@ -21,16 +18,6 @@ var resources: Dictionary = {
     "crystal": 0.0,
 }
 var mine_levels: Dictionary = {"iron": 1, "coal": 1, "copper": 1}
-var installed_equipment: Dictionary = {}
-
-func _init() -> void:
-    for id in Catalog.RESOURCES:
-        if not resources.has(id):
-            resources[id] = 0.0
-    for id in Catalog.mine_definitions():
-        if not mine_levels.has(id):
-            mine_levels[id] = 1
-
 var drill_level: int = 1
 var depth: int = 0
 var jobs: Dictionary = {}
@@ -87,12 +74,12 @@ func advance(seconds: float) -> Dictionary:
                 var previous_depth := depth
                 depth = int(completed_job["target_depth"])
                 report["depth_gained"] += depth - previous_depth
-                installed_equipment.merge(completed_job["equipment"], true)
                 _apply_milestones_up_to(depth)
                 _generate_depth_discoveries(depth)
             else:
-                var output: String = completed_job["output"]
-                var amount: int = int(completed_job["output_quantity"])
+                var recipe: Dictionary = Catalog.RECIPES[completed_job["recipe"]]
+                var output: String = recipe["output"]
+                var amount: int = int(completed_job["quantity"])
                 resources[output] = float(resources[output]) + amount
                 _add_produced(report["produced"], output, amount)
 
@@ -112,7 +99,6 @@ func advance(seconds: float) -> Dictionary:
 
 func snapshot() -> Dictionary:
     return {
-        "installed_equipment": installed_equipment.duplicate(true),
         "resources": resources.duplicate(true),
         "mine_levels": mine_levels.duplicate(true),
         "drill_level": drill_level,
@@ -137,9 +123,6 @@ func restore(data: Dictionary) -> bool:
     if not _valid_snapshot(data):
         return false
 
-    installed_equipment = data["installed_equipment"].duplicate(true)
-    for id in installed_equipment:
-        installed_equipment[id] = int(installed_equipment[id])
     _restore_core(data)
     center_level = int(data["center_level"])
     permanent_sites = data["permanent_sites"].duplicate(true)
@@ -157,46 +140,37 @@ func restore(data: Dictionary) -> bool:
     return true
 
 func restore_v1(data: Dictionary, seed: int) -> bool:
-    var legacy = LegacyGame.new()
-    if not legacy.restore_v1(data, seed):
+    if seed == 0 or not _valid_v1_snapshot(data):
         return false
-    return _migrate_legacy(legacy)
 
-func restore_v2(data: Dictionary) -> bool:
-    var legacy = LegacyGame.new()
-    if not legacy.restore(data):
-        return false
-    return _migrate_legacy(legacy)
+    var restored_resources: Dictionary = data["resources"].duplicate(true)
+    for id in restored_resources:
+        restored_resources[id] = float(restored_resources[id])
+    restored_resources["crystal"] = 0.0
+    resources = restored_resources
 
-func _migrate_legacy(legacy) -> bool:
-    var data: Dictionary = legacy.snapshot()
-    for id in Catalog.RESOURCES:
-        if not data["resources"].has(id):
-            data["resources"][id] = 0.0
-    for id in Catalog.mine_definitions():
-        if not data["mine_levels"].has(id):
-            data["mine_levels"][id] = 1
-    var equipment := {}
-    for gate in Catalog.GATES:
-        if int(gate) <= int(data["depth"]):
-            equipment.merge(Catalog.GATES[gate], true)
-    for level in Catalog.DRILL_UPGRADES:
-        if int(level) < int(data["drill_level"]):
-            equipment.merge(Catalog.DRILL_UPGRADES[level]["cost"], true)
-    data["installed_equipment"] = equipment
-    for facility in data["jobs"]:
-        var job: Dictionary = data["jobs"][facility]
-        if facility == "drill":
-            job["legacy"] = true
-            job["equipment"] = {}
-            for id in Catalog.GATES.get(int(job["target_depth"]), {}):
-                if not equipment.has(id):
-                    job["equipment"][id] = Catalog.GATES[int(job["target_depth"])][id]
-        else:
-            job["output"] = LegacyCatalog.RECIPES[job["recipe"]]["output"]
-            job["output_quantity"] = int(job["quantity"])
-            job["legacy"] = true
-    return restore(data)
+    var restored_levels: Dictionary = data["mine_levels"].duplicate(true)
+    for id in restored_levels:
+        restored_levels[id] = int(restored_levels[id])
+    mine_levels = restored_levels
+    drill_level = int(data["drill_level"])
+    depth = int(data["depth"])
+    jobs = _restored_jobs(data["jobs"])
+
+    center_level = 1
+    permanent_sites = {}
+    discoveries = {}
+    explorations = {}
+    claimed_milestones = []
+    tech_points = 0
+    unlocked_technologies = []
+    built_technologies = []
+    priority_branch = ""
+    priority_cooldown_remaining = 0.0
+    active_event = {}
+    pending_events = []
+    world_seed = seed
+    return true
 
 func apply_retroactive_milestones() -> void:
     _apply_milestones_up_to(depth)
@@ -407,9 +381,7 @@ func can_afford(cost: Dictionary) -> bool:
     return true
 
 func mine_rate(id: String) -> float:
-    if not Catalog.mine_definitions().has(id) or not mine_levels.has(id):
-        return 0.0
-    if depth < int(Catalog.mine_definitions()[id].get("depth", 0)):
+    if not Catalog.MINES.has(id) or not mine_levels.has(id):
         return 0.0
     var depth_bonus := 1.0 + 0.15 * floori(float(depth) / 30.0)
     var event_multiplier := 1.0
@@ -417,37 +389,16 @@ func mine_rate(id: String) -> float:
         var event_type := str(active_event.get("type", ""))
         if Catalog.EVENTS.has(event_type):
             event_multiplier += float(Catalog.EVENTS[event_type].get("rate_bonus", 0.0))
-    return float(Catalog.mine_definitions()[id]["base_rate"]) * int(mine_levels[id]) * depth_bonus * production_multiplier() * event_multiplier
+    return float(Catalog.MINES[id]["base_rate"]) * int(mine_levels[id]) * depth_bonus * production_multiplier() * event_multiplier
 
 func mine_upgrade_cost(id: String) -> Dictionary:
-    if not Catalog.mine_definitions().has(id) or not mine_levels.has(id):
+    if not Catalog.MINES.has(id) or not mine_levels.has(id):
         return {}
     var level := int(mine_levels[id])
     return {"iron": 8 * level * level, "coal": 4 * level * level}
 
-func _uninstalled_cost(cost: Dictionary) -> Dictionary:
-    var result := {}
-    for id in cost:
-        if not installed_equipment.has(id):
-            result[id] = cost[id]
-    return result
-
 func drill_upgrade_cost() -> Dictionary:
-    if not Catalog.DRILL_UPGRADES.has(drill_level):
-        return {}
-    return _uninstalled_cost(Catalog.DRILL_UPGRADES[drill_level]["cost"])
-
-func drill_upgrade_block_reason() -> String:
-    if not Catalog.DRILL_UPGRADES.has(drill_level):
-        return "Foreuse au niveau maximum"
-    if depth < int(Catalog.DRILL_UPGRADES[drill_level]["depth"]):
-        return "Profondeur insuffisante"
-    if not can_afford(drill_upgrade_cost()):
-        return "Ressources insuffisantes"
-    return ""
-
-func excavation_cost() -> Dictionary:
-    return _uninstalled_cost(Catalog.GATES.get(depth + 10, {}))
+    return {"iron_ingot": 2 * drill_level, "cable": drill_level}
 
 func batch_block_reason(recipe: String, quantity: int) -> String:
     if not Catalog.RECIPES.has(recipe):
@@ -455,8 +406,6 @@ func batch_block_reason(recipe: String, quantity: int) -> String:
     if quantity < 1 or quantity > 10:
         return "La quantité doit être comprise entre 1 et 10"
     var definition: Dictionary = Catalog.RECIPES[recipe]
-    if depth < int(definition.get("depth", 0)):
-        return "Profondeur insuffisante"
     var facility: String = definition["facility"]
     if jobs.has(facility):
         return "Installation occupée"
@@ -468,10 +417,12 @@ func batch_block_reason(recipe: String, quantity: int) -> String:
 func excavation_block_reason() -> String:
     if jobs.has("drill"):
         return "Foreuse occupée"
-    if depth >= Catalog.MAX_DEPTH:
-        return "Profondeur maximum atteinte"
-    if not can_afford(excavation_cost()):
-        return "Équipements insuffisants"
+    var target_depth := depth + 10
+    var required_level := mini(Catalog.MAX_DRILL_LEVEL, 1 + floori(float(target_depth) / 30.0))
+    if Catalog.MILESTONES.has(target_depth):
+        required_level = maxi(required_level, int(Catalog.MILESTONES[target_depth].get("requires_drill", 1)))
+    if drill_level < required_level:
+        return "Niveau de foreuse insuffisant"
     return ""
 
 func excavation_duration() -> float:
@@ -485,9 +436,6 @@ func start_batch(recipe: String, quantity: int) -> bool:
     _spend(cost)
     var duration := float(definition["seconds"]) * quantity
     jobs[definition["facility"]] = {
-        "output": definition["output"],
-        "output_quantity": quantity * int(definition.get("yield", 1)),
-        "legacy": false,
         "recipe": recipe,
         "quantity": quantity,
         "remaining": duration,
@@ -496,9 +444,7 @@ func start_batch(recipe: String, quantity: int) -> bool:
     return true
 
 func upgrade_mine(id: String) -> bool:
-    if not Catalog.mine_definitions().has(id) or not mine_levels.has(id):
-        return false
-    if depth < int(Catalog.mine_definitions()[id].get("depth", 0)):
+    if not Catalog.MINES.has(id) or not mine_levels.has(id):
         return false
     if int(mine_levels[id]) >= Catalog.MAX_MINE_LEVEL:
         return false
@@ -510,13 +456,12 @@ func upgrade_mine(id: String) -> bool:
     return true
 
 func upgrade_drill() -> bool:
-    if drill_upgrade_block_reason() != "":
+    if drill_level >= Catalog.MAX_DRILL_LEVEL:
         return false
     var cost := drill_upgrade_cost()
     if not can_afford(cost):
         return false
     _spend(cost)
-    installed_equipment.merge(Catalog.DRILL_UPGRADES[drill_level]["cost"], true)
     drill_level += 1
     return true
 
@@ -524,11 +469,7 @@ func start_excavation() -> bool:
     if excavation_block_reason() != "":
         return false
     var duration := excavation_duration()
-    var equipment := excavation_cost()
-    _spend(equipment)
     jobs["drill"] = {
-        "legacy": false,
-        "equipment": equipment,
         "target_depth": depth + 10,
         "remaining": duration,
         "duration": duration,
@@ -553,20 +494,6 @@ func _apply_milestones_up_to(target_depth: int) -> void:
     claimed_milestones.sort()
 
 func _generate_depth_discoveries(target_depth: int) -> void:
-    if target_depth == 1000:
-        var slot := 0
-        if discoveries.has("1000:0") and str(discoveries["1000:0"]["type"]) != "ancient_structure":
-            slot = 1
-        var id := "1000:%d" % slot
-        if discoveries.has(id):
-            return
-        _ensure_discovery(target_depth, slot)
-        var ancient: Dictionary = discoveries[id]
-        ancient["type"] = "ancient_structure"
-        ancient["kind"] = Catalog.POCKET_TYPES["ancient_structure"]["kind"]
-        ancient["hint"] = Catalog.POCKET_TYPES["ancient_structure"]["hint"]
-        ancient["reward"] = {"tech_points": 1}
-        return
     if not Discovery.should_generate(world_seed, target_depth, 0):
         return
     _ensure_discovery(target_depth, 0)
@@ -583,7 +510,7 @@ func _advance_for_duration(seconds: float, produced: Dictionary) -> void:
     priority_cooldown_remaining = maxf(0.0, priority_cooldown_remaining - seconds)
 
 func _produce_minerals(seconds: float, produced: Dictionary) -> void:
-    for id in Catalog.mine_definitions():
+    for id in Catalog.MINES:
         var amount := mine_rate(id) * seconds
         resources[id] = float(resources[id]) + amount
         _add_produced(produced, id, amount)
@@ -677,25 +604,19 @@ func _restored_jobs(source: Dictionary) -> Dictionary:
         restored_jobs[facility]["duration"] = float(restored_jobs[facility]["duration"])
         if facility == "drill":
             restored_jobs[facility]["target_depth"] = int(restored_jobs[facility]["target_depth"])
-            for id in restored_jobs[facility]["equipment"]:
-                restored_jobs[facility]["equipment"][id] = int(restored_jobs[facility]["equipment"][id])
-        elif facility != "recovery":
+        else:
             restored_jobs[facility]["quantity"] = int(restored_jobs[facility]["quantity"])
-        if facility != "drill":
-            restored_jobs[facility]["output_quantity"] = int(restored_jobs[facility]["output_quantity"])
     return restored_jobs
 
 func _valid_snapshot(data: Dictionary) -> bool:
     var keys := [
-        "installed_equipment", "resources", "mine_levels", "drill_level", "depth", "jobs",
+        "resources", "mine_levels", "drill_level", "depth", "jobs",
         "center_level", "permanent_sites", "discoveries", "explorations",
         "claimed_milestones", "tech_points", "unlocked_technologies",
         "built_technologies", "priority_branch", "priority_cooldown_remaining",
         "active_event", "pending_events", "world_seed",
     ]
     if not _has_exact_keys(data, keys):
-        return false
-    if not _valid_equipment(data["installed_equipment"]):
         return false
     if not _valid_core_values(data, Catalog.RESOURCES.keys()):
         return false
@@ -767,7 +688,7 @@ func _valid_core_values(data: Dictionary, resource_ids: Array) -> bool:
         if not _finite_number(value) or float(value) < 0.0:
             return false
 
-    if typeof(data["mine_levels"]) != TYPE_DICTIONARY or not _has_exact_keys(data["mine_levels"], Catalog.mine_definitions().keys()):
+    if typeof(data["mine_levels"]) != TYPE_DICTIONARY or not _has_exact_keys(data["mine_levels"], Catalog.MINES.keys()):
         return false
     for value in data["mine_levels"].values():
         if not _valid_integer(value, 1, Catalog.MAX_MINE_LEVEL):
@@ -788,15 +709,7 @@ func _valid_core_values(data: Dictionary, resource_ids: Array) -> bool:
         if facility == "drill":
             if not _valid_drill_job(job, restored_depth, restored_drill_level):
                 return false
-            for id in Catalog.GATES.get(restored_depth + 10, {}):
-                if not data["installed_equipment"].has(id) and not job["equipment"].has(id):
-                    return false
-        elif facility == "recovery":
-            if not _valid_recovery_job(job, data):
-                return false
         elif not _valid_batch_job(facility, job):
-            return false
-        elif not bool(job["legacy"]) and restored_depth < int(Catalog.RECIPES[job["recipe"]]["depth"]):
             return false
     return true
 
@@ -899,82 +812,36 @@ func _integer_array(value: Array) -> Array:
         result.append(int(entry))
     return result
 
-func _valid_equipment(value: Variant) -> bool:
-    if typeof(value) != TYPE_DICTIONARY:
-        return false
-    var allowed := {}
-    for cost in Catalog.GATES.values():
-        allowed.merge(cost, true)
-    for upgrade in Catalog.DRILL_UPGRADES.values():
-        allowed.merge(upgrade["cost"], true)
-    for id in value:
-        if not allowed.has(id) or not _valid_integer(value[id], 1) or int(value[id]) != int(allowed[id]):
-            return false
-    return true
-
 func _valid_batch_job(facility: String, job: Dictionary) -> bool:
-    if not _has_exact_keys(job, ["recipe", "quantity", "remaining", "duration", "output", "output_quantity", "legacy"]):
+    if not _has_exact_keys(job, ["recipe", "quantity", "remaining", "duration"]):
         return false
-    if typeof(job["legacy"]) != TYPE_BOOL or typeof(job["recipe"]) != TYPE_STRING:
+    if typeof(job["recipe"]) != TYPE_STRING or not Catalog.RECIPES.has(job["recipe"]):
         return false
-    var recipes: Dictionary = LegacyCatalog.RECIPES if job["legacy"] else Catalog.RECIPES
-    if not recipes.has(job["recipe"]):
+    var recipe: Dictionary = Catalog.RECIPES[job["recipe"]]
+    if recipe["facility"] != facility or not _valid_integer(job["quantity"], 1, 10):
         return false
-    var recipe: Dictionary = recipes[job["recipe"]]
-    if recipe["facility"] != facility or not _valid_integer(job["quantity"], 1, 10) or not _valid_job_times(job):
+    if not _valid_job_times(job):
         return false
-    return typeof(job["output"]) == TYPE_STRING and job["output"] == recipe["output"] and _valid_integer(job["output_quantity"], 1) and int(job["output_quantity"]) == int(job["quantity"]) * int(recipe.get("yield", 1)) and is_equal_approx(float(job["duration"]), float(recipe["seconds"]) * int(job["quantity"]))
+    var expected_duration := float(recipe["seconds"]) * int(job["quantity"])
+    return is_equal_approx(float(job["duration"]), expected_duration)
 
 func _valid_drill_job(job: Dictionary, restored_depth: int, restored_drill_level: int) -> bool:
-    if not _has_exact_keys(job, ["target_depth", "remaining", "duration", "equipment", "legacy"]) or typeof(job["legacy"]) != TYPE_BOOL:
+    if not _has_exact_keys(job, ["target_depth", "remaining", "duration"]):
         return false
-    if not _valid_integer(job["target_depth"], 10) or int(job["target_depth"]) != restored_depth + 10 or not _valid_job_times(job) or not _valid_equipment(job["equipment"]):
+    if not _valid_integer(job["target_depth"], 10):
         return false
-    if not bool(job["legacy"]) and int(job["target_depth"]) > Catalog.MAX_DEPTH:
+    if int(job["target_depth"]) != restored_depth + 10 or not _valid_job_times(job):
         return false
-    if bool(job["legacy"]):
-        var historical: Dictionary = job.duplicate(true)
-        historical.erase("equipment")
-        historical.erase("legacy")
-        if not LegacyGame.new()._valid_drill_job(historical, restored_depth, restored_drill_level):
-            return false
-    var gate: Dictionary = Catalog.GATES.get(restored_depth + 10, {})
-    for id in job["equipment"]:
-        if not gate.has(id) or int(job["equipment"][id]) != int(gate[id]):
-            return false
-    for committed_level in range(1, restored_drill_level + 1):
-        if is_equal_approx(float(job["duration"]), (30.0 + restored_depth * 0.5) / committed_level):
+    var required_level := mini(Catalog.MAX_DRILL_LEVEL, 1 + floori(float(restored_depth + 10) / 30.0))
+    if Catalog.MILESTONES.has(restored_depth + 10):
+        required_level = maxi(required_level, int(Catalog.MILESTONES[restored_depth + 10].get("requires_drill", 1)))
+    if restored_drill_level < required_level:
+        return false
+    for committed_level in range(required_level, restored_drill_level + 1):
+        var committed_duration := (30.0 + restored_depth * 0.5) / committed_level
+        if is_equal_approx(float(job["duration"]), committed_duration):
             return true
     return false
-
-func fragment_recovery_block_reason(site_id: String) -> String:
-    if depth < 1000:
-        return "Récupération disponible à 1 000 m"
-    if not permanent_sites.has(site_id) or not discoveries.has(site_id):
-        return "Structure ancienne inconnue"
-    if str(permanent_sites[site_id].get("type", "")) != "ancient_structure" or str(discoveries[site_id].get("type", "")) != "ancient_structure" or str(discoveries[site_id].get("state", "")) != "opened" or not bool(permanent_sites[site_id].get("active", false)):
-        return "Structure ancienne inactive"
-    if jobs.has("recovery"):
-        return "Récupération déjà en cours"
-    return ""
-
-func start_fragment_recovery(site_id: String) -> bool:
-    if fragment_recovery_block_reason(site_id) != "":
-        return false
-    jobs["recovery"] = {"site_id": site_id, "output": "ancient_fragment", "output_quantity": 1, "remaining": 300.0, "duration": 300.0}
-    return true
-
-func _valid_recovery_job(job: Dictionary, data: Dictionary) -> bool:
-    if not _has_exact_keys(job, ["site_id", "output", "output_quantity", "remaining", "duration"]) or not _valid_job_times(job):
-        return false
-    if typeof(job["site_id"]) != TYPE_STRING or typeof(job["output"]) != TYPE_STRING or job["output"] != "ancient_fragment" or not _valid_integer(job["output_quantity"], 1, 1) or float(job["duration"]) != 300.0 or int(data["depth"]) < 1000:
-        return false
-    var id: String = job["site_id"]
-    if typeof(data["permanent_sites"]) != TYPE_DICTIONARY or typeof(data["discoveries"]) != TYPE_DICTIONARY:
-        return false
-    if not data["permanent_sites"].has(id) or not data["discoveries"].has(id) or typeof(data["permanent_sites"][id]) != TYPE_DICTIONARY or typeof(data["discoveries"][id]) != TYPE_DICTIONARY:
-        return false
-    return data["permanent_sites"].has(id) and data["discoveries"].has(id) and str(data["permanent_sites"][id].get("type", "")) == "ancient_structure" and str(data["discoveries"][id].get("state", "")) == "opened"
 
 func _valid_job_times(job: Dictionary) -> bool:
     if not _finite_number(job["remaining"]) or not _finite_number(job["duration"]):

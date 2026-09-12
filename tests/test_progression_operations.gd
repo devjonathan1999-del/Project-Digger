@@ -72,6 +72,8 @@ func test_crystal_cavern_becomes_permanent_producer(t: TestSupport) -> void:
     t.check(game.resources["crystal"] > before, "site cristallin actif produit du cristal")
 
 func _fund(game) -> void:
+    for resource_id in game.resources:
+        game.resources[resource_id] = 1000.0
     game.resources["iron"] = 1000.0
     game.resources["coal"] = 1000.0
     game.resources["copper"] = 1000.0

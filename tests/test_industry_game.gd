@@ -17,7 +17,10 @@ func run(t: TestSupport) -> void:
 
 func test_initial_stock_and_automatic_extraction(t: TestSupport) -> void:
     var game = IndustryGameScript.new()
-    t.equal(game.resources, {
+    var expected := {}
+    for id in IndustryCatalogScript.RESOURCES:
+        expected[id] = 0.0
+    expected.merge({
         "iron": 12.0,
         "coal": 8.0,
         "copper": 8.0,
@@ -25,7 +28,8 @@ func test_initial_stock_and_automatic_extraction(t: TestSupport) -> void:
         "copper_ingot": 0.0,
         "cable": 0.0,
         "crystal": 0.0,
-    }, "stocks initiaux complets")
+    }, true)
+    t.equal(game.resources, expected, "stocks initiaux complets, nouvelles ressources à zéro")
 
     var report: Dictionary = game.advance(10.0)
     t.check(is_equal_approx(game.resources["iron"], 14.0), "dix secondes produisent deux fers")
@@ -99,7 +103,7 @@ func test_batch_rejections_do_not_mutate(t: TestSupport) -> void:
 func test_upgrade_costs_limits_and_rates(t: TestSupport) -> void:
     var game = IndustryGameScript.new()
     t.equal(game.mine_upgrade_cost("iron"), {"iron": 8, "coal": 4}, "coût mine niveau un")
-    t.equal(game.drill_upgrade_cost(), {"iron_ingot": 2, "cable": 1}, "coût foreuse niveau un")
+    t.equal(game.drill_upgrade_cost(), {"drill_head_1": 1}, "première amélioration utilise une tête fabriquée")
     t.check(game.upgrade_mine("iron"), "mine de fer améliorée")
     t.equal(game.mine_levels["iron"], 2, "niveau mine incrémenté")
     t.equal(game.resources["iron"], 4.0, "fer du coût prélevé")
@@ -130,6 +134,7 @@ func test_excavation_requirements_and_rate_threshold(t: TestSupport) -> void:
     var game = IndustryGameScript.new()
     game.depth = 20
     game.drill_level = 2
+    game.resources["mechanical_chassis"] = 1.0
     t.check(is_equal_approx(game.excavation_duration(), 20.0), "durée dépend profondeur et niveau")
     t.check(game.start_excavation(), "chantier vers trente mètres autorisé niveau deux")
     game.advance(20.0)
@@ -140,12 +145,14 @@ func test_large_advance_matches_small_steps_across_excavation(t: TestSupport) ->
     var large = IndustryGameScript.new()
     large.depth = 20
     large.drill_level = 2
+    large.resources["mechanical_chassis"] = 1.0
     t.check(large.start_excavation(), "forage long pas démarré")
     var large_report: Dictionary = large.advance(3600.0)
 
     var stepped = IndustryGameScript.new()
     stepped.depth = 20
     stepped.drill_level = 2
+    stepped.resources["mechanical_chassis"] = 1.0
     t.check(stepped.start_excavation(), "forage pas à pas démarré")
     var stepped_depth_gained := 0
     for index in range(360):

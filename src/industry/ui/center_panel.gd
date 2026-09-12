@@ -11,6 +11,8 @@ var _upgrade_cost: Label
 var _upgrade: Button
 var _sites: VBoxContainer
 var _built := false
+var _site_signature := ""
+var _recovery_widgets: Dictionary = {}
 
 func _ready() -> void:
     _ensure_built()
@@ -61,6 +63,21 @@ func refresh() -> void:
     _rebuild_sites()
 
 func _rebuild_sites() -> void:
+    for id in _recovery_widgets:
+        var widgets: Dictionary = _recovery_widgets[id]
+        var reason: String = session.game.fragment_recovery_block_reason(str(id))
+        widgets["button"].disabled = reason != ""
+        widgets["label"].text = "1 fragment · 5 min" if reason == "" else reason
+        if session.game.jobs.has("recovery"):
+            widgets["label"].text = "Récupération en cours · reste %d s" % ceili(float(session.game.jobs["recovery"]["remaining"]))
+    var signature := str(session.game.permanent_sites)
+    if signature == _site_signature:
+        return
+    for button in _sites.find_children("*", "Button", true, false):
+        if button.is_pressed():
+            return
+    _site_signature = signature
+    _recovery_widgets.clear()
     for child in _sites.get_children():
         child.queue_free()
     var game = session.game
@@ -80,6 +97,19 @@ func _rebuild_sites() -> void:
         var target_state := not bool(site.get("active", false))
         button.disabled = game.site_toggle_block_reason(str(id), target_state) != ""
         button.pressed.connect(_toggle_site.bind(str(id), target_state))
+        if str(site.get("type", "")) == "ancient_structure":
+            var recovery := _button(box, "Récupérer un fragment", "SiteRecovery_" + str(id).replace(":", "_"))
+            var reason: String = game.fragment_recovery_block_reason(str(id))
+            recovery.disabled = reason != ""
+            recovery.pressed.connect(_recover.bind(str(id)))
+            var progress := _label(box, "1 fragment · 5 min" if reason == "" else reason, 13, Style.COPPER)
+            _recovery_widgets[id] = {"button": recovery, "label": progress}
+
+func _recover(id: String) -> void:
+    if session != null:
+        session.start_fragment_recovery(id)
+        _site_signature = ""
+        refresh()
 
 func _upgrade_center() -> void:
     if session != null:
@@ -92,7 +122,7 @@ func _toggle_site(id: String, active: bool) -> void:
 func _cost(cost: Dictionary) -> String:
     var parts := PackedStringArray()
     for id in cost:
-        parts.append("%d %s" % [int(cost[id]), Catalog.RESOURCES[id]["label"]])
+        parts.append("%s : %.1f / %d" % [Catalog.RESOURCES[id]["label"], float(session.game.resources.get(id, 0)) if session != null else 0.0, int(cost[id])])
     return " · ".join(parts) if not parts.is_empty() else "Aucune ressource"
 
 func _card(parent: Node, padding: int = 16) -> VBoxContainer:
@@ -118,6 +148,6 @@ func _button(parent: Node, title: String, node_name: String) -> Button:
     var button := Button.new()
     button.name = node_name
     button.text = title
-    button.custom_minimum_size.y = 40
+    button.custom_minimum_size.y = 44
     parent.add_child(button)
     return button

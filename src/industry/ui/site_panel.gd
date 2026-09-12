@@ -114,11 +114,8 @@ func refresh() -> void:
             elif excavation_reason != "":
                 _body.text += "\n" + excavation_reason
             _configure_action(_primary, "FORER", excavation_reason, Callable(_session, "start_excavation"))
-            var upgrade_reason := ""
-            if int(game.drill_level) >= Catalog.MAX_DRILL_LEVEL:
-                upgrade_reason = "Niveau maximum"
-            elif not game.can_afford(game.drill_upgrade_cost()):
-                upgrade_reason = "Ressources insuffisantes"
+            var upgrade_reason: String = game.drill_upgrade_block_reason()
+            _body.text += "\nForage : %s\nAmélioration : %s" % [_cost(game.excavation_cost()), _cost(game.drill_upgrade_cost())]
             _configure_action(_secondary, "AMÉLIORER", upgrade_reason, Callable(_session, "upgrade_drill"))
         "discovery":
             if not game.discoveries.has(_id):
@@ -149,6 +146,14 @@ func refresh() -> void:
             var target_state := not active
             var site_reason: String = str(game.site_toggle_block_reason(_id, target_state))
             _configure_action(_primary, "DÉSACTIVER" if active else "ACTIVER", site_reason, Callable(_session, "set_site_active").bind(_id, target_state))
+            if str(site.get("type", "")) == "ancient_structure":
+                var recovery_reason: String = game.fragment_recovery_block_reason(_id)
+                _body.text += "\nRécupération : 1 fragment · 5 min"
+                if game.jobs.has("recovery"):
+                    _body.text += "\nReste %s" % _duration(float(game.jobs["recovery"]["remaining"]))
+                elif recovery_reason != "":
+                    _body.text += "\n" + recovery_reason
+                _configure_action(_secondary, "RÉCUPÉRER UN FRAGMENT", recovery_reason, Callable(_session, "start_fragment_recovery").bind(_id))
         "event":
             if game.active_event.is_empty():
                 clear_selection()
@@ -208,7 +213,7 @@ func _ensure_built() -> void:
     var close := Button.new()
     close.name = "ContextClose"
     close.text = "×"
-    close.custom_minimum_size = Vector2(34, 34)
+    close.custom_minimum_size = Vector2(44, 44)
     close.pressed.connect(clear_selection)
     header.add_child(close)
     _body = _label(content, "", 13, Style.TEXT)
@@ -223,7 +228,7 @@ func _ensure_built() -> void:
         var choice := Button.new()
         choice.name = "Event_" + resource_id
         choice.text = Catalog.RESOURCES[resource_id]["label"]
-        choice.custom_minimum_size.y = 36
+        choice.custom_minimum_size.y = 44
         choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
         choice.pressed.connect(_choose_event_resource.bind(resource_id))
         _event_choices.add_child(choice)
@@ -231,12 +236,12 @@ func _ensure_built() -> void:
     _primary = Button.new()
     _primary.name = "ContextPrimary"
     _primary.text = "Action"
-    _primary.custom_minimum_size.y = 38
+    _primary.custom_minimum_size.y = 44
     content.add_child(_primary)
     _secondary = Button.new()
     _secondary.name = "ContextSecondary"
     _secondary.text = "Action secondaire"
-    _secondary.custom_minimum_size.y = 38
+    _secondary.custom_minimum_size.y = 44
     content.add_child(_secondary)
 
 func _cost(cost: Dictionary) -> String:
@@ -245,7 +250,7 @@ func _cost(cost: Dictionary) -> String:
     var parts := PackedStringArray()
     for resource_id in cost:
         var label := str(Catalog.RESOURCES.get(resource_id, {"label": resource_id}).get("label", resource_id))
-        parts.append("%d %s" % [int(cost[resource_id]), label])
+        parts.append("%s : %.1f / %d" % [label, float(_session.game.resources.get(resource_id, 0)) if _session != null else 0.0, int(cost[resource_id])])
     return " · ".join(parts)
 
 func _duration(seconds: float) -> String:

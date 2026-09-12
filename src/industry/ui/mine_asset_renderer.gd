@@ -12,6 +12,9 @@ var _session
 var _world: Control
 var _v07_metrics: Dictionary = {}
 
+func next_progression_caption(depth: int) -> String:
+    return PortraitPainter.next_progression_caption(depth)
+
 func _ready() -> void:
     name = "MineAssetRenderer"
     mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -222,8 +225,7 @@ func _draw_portrait_front() -> void:
     draw_line(Vector2(center_x - half, front_y), Vector2(center_x + half, front_y), Color("d59758"), 4.0)
     for x in range(int(center_x - half + 6.0), int(center_x + half - 10.0), 16):
         draw_line(Vector2(float(x), front_y + 3.0), Vector2(float(x) + 8.0, front_y + 11.0), Color("73583c"), 3.0)
-    var next_depth := (depth / 30 + 1) * 30
-    var caption := "À explorer" if depth >= 150 else "Palier %d m" % next_depth
+    var caption := next_progression_caption(depth)
     var width := minf(132.0, size.x * 0.28)
     var plate := Rect2(center_x - width * 0.5, front_y + 18.0, width, 30.0)
     draw_rect(plate, Color("0d1b23"))

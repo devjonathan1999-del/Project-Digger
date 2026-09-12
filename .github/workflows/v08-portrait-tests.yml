@@ -5,6 +5,7 @@ on:
     branches:
       - feature/portrait-v0.8
       - feature/portrait-polish-v0.8.1
+      - feature/industrial-economy-v0.9
   pull_request:
     branches:
       - main
@@ -51,6 +52,17 @@ jobs:
           status=${PIPESTATUS[0]}
           if [[ $status -ne 0 ]]; then exit "$status"; fi
           if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-final-art.log; then exit 1; fi
+
+      - name: Verify industrial economy and save regressions
+        shell: bash
+        run: |
+          set +e
+          for suite in test_economy_catalog test_economy_simulation test_economy_ui test_economy_route test_runner; do
+            timeout 120s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . -s "res://tests/$suite.gd" 2>&1 | tee "godot-$suite.log"
+            status=${PIPESTATUS[0]}
+            if [[ $status -ne 0 ]]; then exit "$status"; fi
+            if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' "godot-$suite.log"; then exit 1; fi
+          done
 
       - name: Upload portrait screenshots
         uses: actions/upload-artifact@v7.0.1

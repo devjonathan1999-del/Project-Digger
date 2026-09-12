@@ -157,7 +157,7 @@ func _build_compact_hud(parent: Node) -> void:
     var tagline := _label(title_box, "EXTRAIRE · BÂTIR", 8, Style.MUTED)
     tagline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-    for id in Catalog.RESOURCES:
+    for id in HUD_RESOURCE_LABELS:
         var chip := _hud_panel(_compact_hud, 0)
         var row := HBoxContainer.new()
         row.add_theme_constant_override("separation", 5)

@@ -131,6 +131,7 @@ func test_progression_action_is_persisted(t: TestSupport) -> void:
     session.game.depth = 30
     session.game.resources["iron"] = 100.0
     session.game.resources["coal"] = 100.0
+    session.game.resources["mechanical_chassis"] = 1.0
     t.check(session.upgrade_center(), "amélioration Centre exposée par la session")
 
     var reopened = IndustrySessionScript.new()

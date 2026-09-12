@@ -1,0 +1,170 @@
+Structure industrielle
+
+Je verrais six bâtiments de production : Fonderie pour les métaux et alliages, Atelier pour les pièces simples, Usinage pour la mécanique avancée, Chimie pour les produits transformés, Électronique pour les circuits et automatismes, puis Laboratoire cristallin pour le cristal et la technologie ancienne.
+
+Palier 1 — Surface à 30 m : comprendre la boucle
+#	Installation	Recette	Coût	Temps
+1	Fonderie	Lingot de fer	4 Fer + 1 Charbon	20 s
+2	Fonderie	Lingot de cuivre	3 Cuivre + 1 Charbon	25 s
+3	Atelier	Câble	2 Lingots Cu + 1 Lingot Fe	40 s
+4	Atelier	Plaque de fer	2 Lingots Fe	30 s
+5	Atelier	Fil de cuivre ×4	1 Lingot Cu	30 s
+6	Atelier	Engrenage	2 Lingots Fe	45 s
+7	Atelier	Boulons ×4	1 Lingot Fe	25 s
+8	Atelier	Chaîne	2 Lingots Fe	50 s
+9	Fonderie	Graphite	4 Charbon	40 s
+10	Atelier	Châssis mécanique	2 Plaques Fe + 1 Engrenage + 2 Boulons	1 min 30
+
+Le joueur comprend déjà la logique : miner → fondre → fabriquer.
+
+Palier 2 — 30 à 60 m : première industrie
+#	Installation	Recette	Coût	Temps
+11	Fonderie	Acier	2 Lingots Fe + 1 Graphite	1 min
+12	Atelier	Plaque d'acier	2 Acier	1 min 15
+13	Usinage	Roulements ×2	1 Acier + 1 Lingot Cu	1 min
+14	Atelier	Bobine de cuivre	3 Fils Cu + 1 Plaque Fe	1 min 30
+15	Usinage	Poulie	1 Plaque acier + 1 Roulement	2 min
+16	Atelier	Câble renforcé	2 Câbles + 1 Plaque acier	2 min
+17	Usinage	Convoyeur	2 Chaînes + 2 Roulements + 1 Châssis	3 min
+18	Usinage	Moteur simple	2 Bobines + 2 Engrenages + 1 Plaque acier	3 min
+19	Usinage	Treuil	1 Moteur + 2 Poulies + 2 Chaînes	5 min
+20	Usinage	Tête de forage I	3 Plaques acier + 2 Engrenages + 1 Câble renforcé	5 min
+
+À ce stade, les crafts commencent à servir directement à la foreuse, l'ascenseur et les convoyeurs.
+
+Palier 3 — 60 à 90 m : infrastructure souterraine
+
+Nouvelle ressource : Silice.
+
+#	Installation	Recette	Coût	Temps
+21	Fonderie	Verre industriel ×2	5 Silice + 1 Charbon	1 min 30
+22	Usinage	Tuyaux acier ×2	1 Plaque acier	1 min 15
+23	Usinage	Vannes ×2	1 Acier + 1 Roulement	1 min 30
+24	Usinage	Ventilateur	1 Moteur + 2 Plaques acier + 1 Câble	4 min
+25	Usinage	Pompe	1 Moteur + 2 Tuyaux + 1 Vanne	5 min
+26	Usinage	Rotor	2 Acier + 1 Bobine + 1 Roulement	3 min
+27	Atelier	Dynamo	1 Rotor + 2 Bobines + 1 Câble	6 min
+28	Usinage	Groupe de pression	1 Pompe + 2 Vannes + 1 Câble renforcé	8 min
+29	Usinage	Module de ventilation	1 Ventilateur + 2 Tuyaux + 1 Châssis	10 min
+30	Usinage	Tête de forage II	Tête I + 2 Plaques acier + 1 Rotor	10 min
+
+Ici, la profondeur commence à exiger de maintenir la mine en fonctionnement, pas seulement d'améliorer un chiffre.
+
+Palier 4 — 90 à 150 m : arrivée du cristal
+#	Installation	Recette	Coût	Temps
+31	Cristallurgie	Cristal taillé	4 Cristaux bruts	2 min
+32	Cristallurgie	Lentille cristalline	2 Cristaux taillés + 1 Verre	4 min
+33	Cristallurgie	Conducteur cristallin	1 Cristal taillé + 4 Fils Cu	5 min
+34	Électronique	Capteur	1 Lentille + 1 Bobine + 1 Câble renforcé	6 min
+35	Électronique	Circuit	2 Fils Cu + 1 Graphite + 1 Verre	5 min
+36	Électronique	Unité de contrôle	2 Circuits + 1 Capteur + 1 Câble	10 min
+37	Usinage	Servomoteur	1 Moteur + 1 Unité contrôle + 1 Roulement	12 min
+38	Électronique	Trieur automatique	1 Servo + 1 Capteur + 1 Convoyeur	15 min
+39	Électronique	Scanner profond	2 Capteurs + 1 Unité contrôle + 1 Lentille	20 min
+40	Électronique	Contrôleur de forage I	1 Unité contrôle + 1 Servo + 1 Conducteur	20 min
+
+C'est le premier vrai changement d'époque : la mine devient automatisée.
+
+Palier 5 — 150 à 240 m : énergie et refroidissement
+
+Nouvelles ressources : Bauxite et Soufre.
+
+#	Installation	Recette	Coût	Temps
+41	Fonderie	Aluminium	4 Bauxite + 1 Charbon	1 min 30
+42	Atelier	Plaque aluminium	2 Aluminium	2 min
+43	Chimie	Soufre raffiné	4 Soufre	1 min 30
+44	Chimie	Électrolyte	1 Soufre raffiné + 1 Graphite + 1 Verre	4 min
+45	Électronique	Cellule batterie	1 Plaque Alu + 1 Électrolyte + 2 Fils Cu	5 min
+46	Électronique	Batterie industrielle	4 Cellules + 1 Câble renforcé + 1 Plaque acier	10 min
+47	Atelier	Châssis léger	3 Plaques Alu + 2 Tuyaux acier	8 min
+48	Atelier	Dissipateur thermique	2 Plaques Alu + 1 Lingot Cu	5 min
+49	Usinage	Module refroidissement	1 Ventilateur + 2 Dissipateurs + 1 Pompe	15 min
+50	Usinage	Tête de forage III	Tête II + 2 Châssis légers + 1 Contrôleur forage	20 min
+Palier 6 — 240 à 360 m : mécanique de précision
+
+Nouvelle ressource : Nickel.
+
+#	Installation	Recette	Coût	Temps
+51	Fonderie	Lingot de nickel	4 Nickel + 1 Charbon	2 min
+52	Fonderie	Acier inoxydable	2 Acier + 1 Nickel	4 min
+53	Atelier	Plaque inox	2 Acier inox	4 min
+54	Usinage	Roulements précision ×2	1 Inox + 1 Lingot Cu	5 min
+55	Électronique	Électroaimant	2 Bobines + 1 Nickel + 1 Graphite	8 min
+56	Usinage	Moteur industriel	2 Électroaimants + 1 Rotor + 2 Roulements précision + 1 Contrôleur	20 min
+57	Usinage	Tubes inox ×2	1 Plaque inox	4 min
+58	Usinage	Vérin hydraulique	2 Tubes inox + 1 Vanne + 1 Groupe pression	15 min
+59	Usinage	Actionneur industriel	1 Vérin + 1 Servo + 1 Unité contrôle	20 min
+60	Usinage	Entraînement d'ascenseur	1 Moteur industriel + 1 Actionneur + 2 Câbles renforcés	30 min
+Palier 7 — 360 à 500 m : forage lourd
+
+Nouvelles ressources : Tungstène et Cobalt.
+
+#	Installation	Recette	Coût	Temps
+61	Fonderie	Lingot tungstène	5 Tungstène + 2 Charbon	3 min
+62	Fonderie	Carbure de tungstène	2 Tungstène + 1 Graphite	6 min
+63	Fonderie	Lingot cobalt	4 Cobalt + 1 Charbon	3 min
+64	Fonderie	Superalliage	2 Inox + 1 Cobalt + 1 Tungstène	10 min
+65	Usinage	Dent carbure ×2	1 Carbure + 1 Plaque acier	6 min
+66	Usinage	Couronne de forage lourd	4 Dents carbure + 2 Superalliages + Tête III	30 min
+67	Électronique	Bobine haute température	2 Bobines Cu + 1 Cobalt + 1 Plaque Alu	12 min
+68	Usinage	Moteur lourd	2 Bobines HT + 1 Rotor + 2 Roulements précision + 1 Contrôleur	30 min
+69	Atelier	Bouclier thermique	2 Superalliages + 2 Dissipateurs + 1 Graphite	20 min
+70	Usinage	Groupe de forage profond	1 Moteur lourd + 1 Couronne + 1 Bouclier + 1 Refroidissement	45 min
+Palier 8 — 500 à 700 m : systèmes autonomes
+
+Nouvelles ressources : Lithium et Titane.
+
+#	Installation	Recette	Coût	Temps
+71	Chimie	Concentré de lithium	5 Lithium	4 min
+72	Électronique	Cellule lithium	1 Concentré + 1 Plaque Alu + 1 Électrolyte	8 min
+73	Électronique	Batterie haute densité	4 Cellules Li + 1 Contrôleur + 1 Bouclier thermique	25 min
+74	Fonderie	Lingot titane	5 Titane + 2 Charbon	5 min
+75	Atelier	Plaque titane	2 Lingots titane	6 min
+76	Usinage	Châssis titane	3 Plaques titane + 2 Tubes inox	20 min
+77	Usinage	Servo de précision	1 Actionneur + 1 Capteur + 1 Contrôleur	25 min
+78	Électronique	Circuit avancé	2 Circuits + 1 Conducteur cristal + 1 Capteur	20 min
+79	Électronique	Noyau de navigation	2 Circuits avancés + 1 Scanner + 1 Batterie HD	45 min
+80	Usinage	Tête de forage IV	1 Couronne lourde + 2 Plaques titane + 1 Noyau navigation	1 h
+Palier 9 — 700 à 1 000 m : technologie de résonance
+
+Nouvelle ressource : Terres rares.
+
+#	Installation	Recette	Coût	Temps
+81	Chimie	Concentré de terres rares	5 Terres rares	5 min
+82	Électronique	Aimant permanent	1 Concentré + 1 Cobalt	12 min
+83	Électronique	Régulateur de flux	2 Aimants + 1 Conducteur cristal + 1 Circuit avancé	30 min
+84	Cristallurgie	Bobine de résonance	2 Bobines HT + 1 Cristal taillé + 1 Aimant	30 min
+85	Cristallurgie	Capteur résonant	1 Lentille + 1 Bobine résonance + 1 Circuit avancé	40 min
+86	Électronique	Noyau logique	3 Circuits avancés + 2 Capteurs résonants + 1 Batterie HD	1 h
+87	Usinage	Moteur vectoriel	2 Aimants + 1 Moteur lourd + 1 Noyau logique	1 h 15
+88	Usinage	Refroidissement actif	1 Module refroidissement + 1 Batterie HD + 1 Noyau logique + 2 Dissipateurs	1 h
+89	Usinage	Module de forage autonome	1 Moteur vectoriel + Tête IV + 1 Noyau logique + 1 Refroidissement actif	2 h
+90	Électronique	Noyau de commande profond	2 Noyaux logiques + 1 Navigation + 1 Capteur résonant + 1 Batterie HD	2 h
+Palier 10 — 1 000 à 1 500 m : technologie ancienne
+
+Nouvelle ressource : Fragments anciens, récupérés dans les structures découvertes plutôt que simplement minés. Ça donne enfin un vrai intérêt économique aux structures anciennes déjà présentes dans le jeu.
+
+#	Installation	Recette	Coût	Temps
+91	Cristallurgie	Alliage ancien	3 Fragments + 1 Titane + 1 Cobalt	30 min
+92	Cristallurgie	Cristal résonant	3 Cristaux + 1 Terre rare + 1 Fragment	45 min
+93	Cristallurgie	Matrice de résonance	2 Cristaux résonants + 2 Circuits avancés + 1 Aimant	1 h
+94	Cristallurgie	Conducteur ancien	1 Alliage ancien + 1 Conducteur cristal + 2 Fils Cu	1 h
+95	Électronique	Noyau de stabilisation	1 Matrice + 2 Conducteurs anciens + 1 Batterie HD	2 h
+96	Usinage	Compensateur inertiel	1 Noyau stabilisation + 2 Châssis titane + 1 Moteur vectoriel	3 h
+97	Cristallurgie	Réacteur profond	2 Noyaux stabilisation + 2 Matrices + 1 Refroidissement actif	4 h
+98	Usinage	Cœur de forage V	Tête IV + 4 Dents carbure + 2 Alliages anciens + 1 Réacteur	6 h
+99	Usinage	Excavateur autonome	1 Cœur forage V + 1 Moteur vectoriel + 1 Noyau commande + 1 Compensateur	8 h
+100	Cristallurgie	Cœur abyssal	2 Réacteurs + 2 Matrices + 2 Alliages anciens + 1 Noyau commande	12 h
+Ce que ça donnerait dans la progression
+
+Le point que je changerais par rapport à notre Digger actuel est important : la profondeur ne devrait plus principalement demander des quantités croissantes de Fer/Cuivre/Câble. Aujourd'hui les niveaux du Centre utilisent justement de plus en plus ces quelques ressources.
+
+Avec ce système, on obtient plutôt :
+
+Fer → Acier → Moteur → Foreuse → Cristal → Circuit → Batterie → Superalliage → Titane → Automatisation → Résonance → Technologie ancienne.
+
+C'est beaucoup plus proche du sentiment Deep Town : chaque nouvel étage te fait te dire « il me manque cette pièce, donc il faut améliorer cette usine, donc il me faut davantage de cette ancienne ressource ».
+
+Et surtout, les anciennes ressources ne deviennent jamais inutiles. Même à 1 000 m, tu continues à consommer du cuivre, du charbon, du fer et du cristal dans des chaînes avancées. C'est essentiel pour que les premières mines restent pertinentes pendant toute la partie.
+
+Je partirais sur cette base des 100 recettes, avec ensuite un équilibrage des quantités et des temps après avoir fixé précisément à quelle vitesse on veut qu'un joueur atteigne 30 m, 90 m, 500 m et 1 000 m. C'est cette durée cible qui permettra de transformer cette liste en vraie économie de jeu.

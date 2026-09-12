@@ -80,6 +80,9 @@ func start_excavation() -> bool:
 func upgrade_center() -> bool:
     return _apply_action(Callable(game, "upgrade_center"))
 
+func start_fragment_recovery(id: String) -> bool:
+    return _apply_action(Callable(game, "start_fragment_recovery").bind(id))
+
 func start_exploration(id: String) -> bool:
     return _apply_action(Callable(game, "start_exploration").bind(id))
 

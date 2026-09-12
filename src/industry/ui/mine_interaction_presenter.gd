@@ -293,6 +293,11 @@ func _label_for_target(target: Button) -> String:
         "Drill":
             return "Foreuse"
     if key.begins_with("Site_"):
+        var site_id := key.trim_prefix("Site_").replace("_", ":")
+        if _world != null and _world.session != null:
+            var site: Dictionary = _world.session.game.permanent_sites.get(site_id, {})
+            if str(site.get("type", "")) == "ancient_structure":
+                return "Structure ancienne"
         return "Site d'exploitation"
     if key.begins_with("Discovery_"):
         var raw := original_text.to_lower()

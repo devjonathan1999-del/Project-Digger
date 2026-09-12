@@ -38,27 +38,27 @@ func test_offline_progress_is_applied_once(t: TestSupport) -> void:
 func test_drill_upgrade_during_excavation_survives_reload(t: TestSupport) -> void:
     _cleanup()
     var game = IndustryGameScript.new()
+    game.depth = 30
     t.check(game.start_excavation(), "forage enregistré avant amélioration")
     game.advance(5.0)
     var committed_job: Dictionary = game.jobs["drill"].duplicate(true)
-    game.resources["iron_ingot"] = 2.0
-    game.resources["cable"] = 1.0
+    game.resources["drill_head_1"] = 1.0
     t.check(game.upgrade_drill(), "foreuse améliorée pendant le forage")
     t.equal(game.jobs["drill"], committed_job, "amélioration conserve le minuteur engagé")
 
     var save = IndustrySaveScript.new()
     t.check(save.save_game(PATH, game, 1000.0), "forage amélioré sauvegardé")
-    var loaded: Dictionary = save.load_game(PATH, 1025.0)
+    var loaded: Dictionary = save.load_game(PATH, 1045.0)
     t.equal(loaded["error"], "", "forage amélioré restauré")
     t.equal(loaded["offline_report"]["completed"], ["drill"], "forage restauré terminé une fois")
-    t.equal(loaded["game"].depth, 10, "forage restauré gagne sa profondeur")
+    t.equal(loaded["game"].depth, 40, "forage restauré gagne sa profondeur")
     t.equal(loaded["game"].jobs.has("drill"), false, "forage terminé retiré")
 
-    t.check(save.save_game(PATH, loaded["game"], 1025.0), "état terminé sauvegardé")
-    var reopened: Dictionary = save.load_game(PATH, 1025.0)
+    t.check(save.save_game(PATH, loaded["game"], 1045.0), "état terminé sauvegardé")
+    var reopened: Dictionary = save.load_game(PATH, 1045.0)
     t.equal(reopened["error"], "", "état terminé rouvert")
     t.equal(reopened["offline_report"]["completed"], [], "forage non crédité deux fois")
-    t.equal(reopened["game"].depth, 10, "profondeur créditée une seule fois")
+    t.equal(reopened["game"].depth, 40, "profondeur créditée une seule fois")
     _cleanup()
 
 func test_affordability_never_spends_below_zero(t: TestSupport) -> void:
@@ -98,7 +98,7 @@ func test_clock_rollback_keeps_saved_instant(t: TestSupport) -> void:
 func test_invalid_files_are_preserved(t: TestSupport) -> void:
     var invalid_payloads: Array[String] = [
         "octets illisibles",
-        JSON.stringify({"version": 3, "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot()}),
+        JSON.stringify({"version": 4, "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot()}),
         JSON.stringify({"version": "2", "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot()}),
         JSON.stringify({"version": 2.5, "saved_at_unix": 1000.0, "industry": IndustryGameScript.new().snapshot()}),
         JSON.stringify({"version": 2, "saved_at_unix": -1.0, "industry": IndustryGameScript.new().snapshot()}),
