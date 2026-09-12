@@ -37,11 +37,11 @@ jobs:
         shell: bash
         run: |
           cat assets/industry/v07/payload/part*.b64 | tr -d '\r\n ' > /tmp/v07-atlas.b64
-          echo "base64-bytes=$(wc -c < /tmp/v07-atlas.b64)"
+          test "$(wc -c < /tmp/v07-atlas.b64)" -eq 32008
           base64 -d /tmp/v07-atlas.b64 > /tmp/v07-atlas.png
-          echo "decoded-bytes=$(wc -c < /tmp/v07-atlas.png)"
-          sha256sum /tmp/v07-atlas.png
-          file /tmp/v07-atlas.png
+          test "$(wc -c < /tmp/v07-atlas.png)" -eq 24006
+          echo "b097eacc7bd7014e6a142b36e2e6554a351e96312feac793c5ed2265707a5925  /tmp/v07-atlas.png" | sha256sum -c -
+          file /tmp/v07-atlas.png | grep -F "PNG image data, 512 x 384"
 
       - name: Exercise asset-driven v0.7 assets
         shell: bash
@@ -51,3 +51,12 @@ jobs:
           status=${PIPESTATUS[0]}
           if [[ $status -ne 0 ]]; then exit "$status"; fi
           if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-v07-assets.log; then exit 1; fi
+
+      - name: Exercise runtime-compatible v0.7 renderer
+        shell: bash
+        run: |
+          set +e
+          timeout 90s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_visual_v07_renderer.gd 2>&1 | tee godot-v07-renderer.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then exit "$status"; fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-v07-renderer.log; then exit 1; fi
