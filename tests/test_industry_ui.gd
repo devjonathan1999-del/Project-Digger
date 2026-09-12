@@ -18,6 +18,10 @@ func _run() -> void:
         quit(t.finish())
         return
 
+    # This legacy test drives raw window coordinates at multiple artificial sizes.
+    # Disable project content scaling here so its historical click/layout assertions
+    # continue to measure those requested dimensions directly.
+    root.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
     root.size = Vector2i(1280, 800)
     DirAccess.make_dir_recursive_absolute("user://tests")
     _cleanup()
