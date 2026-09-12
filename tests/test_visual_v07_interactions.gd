@@ -11,13 +11,6 @@ class FakeWorld:
     var zoom: float = 1.0
     var animation_phase: float = 0.0
 
-func _renderer_count(world: Control) -> int:
-    var count := 0
-    for child in world.get_children():
-        if child.name in ["MineAssetRenderer", "MineModuleRenderer"]:
-            count += 1
-    return count
-
 func _init() -> void:
     var failures := 0
     var world := FakeWorld.new()
@@ -26,8 +19,10 @@ func _init() -> void:
     get_root().add_child(world)
 
     var renderer := Renderer.new()
-    renderer.name = "MineAssetRenderer"
     world.add_child(renderer)
+    # This SceneTree test runs before the normal first-frame ready pass.
+    # Run the visual-only initialization explicitly so input ownership is measurable.
+    renderer._ready()
 
     var iron := Button.new()
     iron.name = "Mine_iron"
@@ -38,10 +33,11 @@ func _init() -> void:
 
     var presenter := Presenter.new()
     world.add_child(presenter)
+    presenter._ready()
     presenter.bind(world)
 
-    if _renderer_count(world) != 1:
-        push_error("v0.7 presenter must reuse MineAssetRenderer instead of creating a v0.6 renderer")
+    if presenter._module_renderer != renderer:
+        push_error("v0.7 presenter must reuse the existing MineAssetRenderer")
         failures += 1
     if renderer.mouse_filter != Control.MOUSE_FILTER_IGNORE:
         push_error("v0.7 renderer must never capture pointer input")
@@ -52,11 +48,12 @@ func _init() -> void:
 
     world.size = Vector2(720, 1000)
     presenter._sync()
+    presenter._ensure_module_renderer()
     if iron.size.y < 44.0:
         push_error("narrow layout must preserve 44 px resource hit targets")
         failures += 1
-    if _renderer_count(world) != 1:
-        push_error("narrow sync must not duplicate the visual renderer")
+    if presenter._module_renderer != renderer:
+        push_error("narrow sync must keep the same v0.7 visual renderer")
         failures += 1
 
     world.free()
