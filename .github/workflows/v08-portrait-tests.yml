@@ -1,0 +1,51 @@
+name: Portrait v0.8 tests
+
+on:
+  push:
+    branches:
+      - feature/portrait-v0.8
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  portrait:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Install Godot 4.7.2
+        shell: bash
+        run: |
+          curl -L -o godot.zip https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
+          unzip -q godot.zip
+          chmod +x Godot_v4.7.2-stable_linux.x86_64
+          ./Godot_v4.7.2-stable_linux.x86_64 --version
+
+      - name: Import project
+        shell: bash
+        run: |
+          set +e
+          timeout 90s ./Godot_v4.7.2-stable_linux.x86_64 --headless --editor --quit --path . 2>&1 | tee godot-import-v08.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then exit "$status"; fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-import-v08.log; then exit 1; fi
+
+      - name: Exercise portrait-first v0.8 layout
+        shell: bash
+        run: |
+          set +e
+          timeout 90s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --path . --audio-driver Dummy --rendering-method gl_compatibility -s res://tests/test_portrait_v08.gd -- --screenshots /tmp/digger-v08 2>&1 | tee godot-v08-portrait.log
+          status=${PIPESTATUS[0]}
+          if [[ $status -ne 0 ]]; then exit "$status"; fi
+          if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-v08-portrait.log; then exit 1; fi
+
+      - name: Upload portrait screenshots
+        uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: digger-v08-portrait
+          path: /tmp/digger-v08
+          if-no-files-found: ignore
