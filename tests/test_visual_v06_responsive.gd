@@ -43,6 +43,7 @@ func _run() -> void:
         t.equal(bool(wide.get("surface_bounds_ok", false)), true, "modules surface dans les bornes desktop")
         t.equal(bool(wide.get("surface_vertical_bounds_ok", false)), true, "modules surface non rognés verticalement sur desktop")
         t.check(float(wide.get("surface_visual_ground_y", 0.0)) >= 110.0, "surface desktop garde de l'air au-dessus du chevalement")
+        t.check(int(wide.get("rock_relief_count", 0)) >= 6, "relief rocheux final assez dense pour casser les bandes plates")
         t.check(int(wide.get("decorative_detail_level", 0)) >= 2, "niveau de détail desktop complet")
 
     for target_name in ["Mine_iron", "Mine_coal", "Mine_copper", "Drill"]:
@@ -61,6 +62,7 @@ func _run() -> void:
         t.check(absf(float(narrow.get("shaft_center_x", -100.0)) - world.size.x * 0.5) <= 2.0, "puits centré sur mobile")
         t.equal(bool(narrow.get("surface_bounds_ok", false)), true, "modules surface dans les bornes mobile")
         t.equal(bool(narrow.get("surface_vertical_bounds_ok", false)), true, "modules surface non rognés verticalement sur mobile")
+        t.check(int(narrow.get("rock_relief_count", 0)) >= 6, "relief rocheux conservé sur mobile")
         t.equal(int(narrow.get("decorative_detail_level", 0)), 1, "détails tertiaires réduits sur mobile")
 
     if world != null:
