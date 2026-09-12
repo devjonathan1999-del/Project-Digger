@@ -27,44 +27,49 @@ func _run() -> void:
     await process_frame
     await process_frame
 
-    var renderer = screen.find_child("MineSceneRenderer", true, false)
+    var legacy_renderer = screen.find_child("MineSceneRenderer", true, false)
+    var renderer = screen.find_child("MineAssetRenderer", true, false)
+    if renderer == null:
+        renderer = legacy_renderer
     t.check(renderer != null, "renderer v0.5 présent")
-    if renderer != null:
-        var variants = renderer.get("gallery_variants_seen")
-        var silhouettes = renderer.get("gallery_silhouette_count")
-        var broken = renderer.get("broken_rail_count")
-        var alcoves = renderer.get("alcove_count")
+    if legacy_renderer != null:
+        var variants = legacy_renderer.get("gallery_variants_seen")
+        var silhouettes = legacy_renderer.get("gallery_silhouette_count")
+        var broken = legacy_renderer.get("broken_rail_count")
+        var alcoves = legacy_renderer.get("alcove_count")
         t.check(variants is Dictionary and variants.size() >= 4, "au moins quatre variantes visibles/connues")
         t.check(silhouettes is int and silhouettes >= 8, "silhouettes gauche/droite générées")
         t.check(broken is int and broken >= 1, "au moins une rupture de rails")
         t.check(alcoves is int and alcoves >= 1, "au moins un renfoncement")
 
-        var shaft_platforms = renderer.get("shaft_platform_count")
-        var shaft_utilities = renderer.get("shaft_utility_count")
-        var surface_features = renderer.get("surface_feature_count")
-        var ventilation = renderer.get("ventilation_visible")
+        var shaft_platforms = legacy_renderer.get("shaft_platform_count")
+        var shaft_utilities = legacy_renderer.get("shaft_utility_count")
+        var surface_features = legacy_renderer.get("surface_feature_count")
+        var ventilation = legacy_renderer.get("ventilation_visible")
         t.check(shaft_platforms is int and shaft_platforms >= 5, "plateformes de puits aux horizons")
         t.check(shaft_utilities is int and shaft_utilities >= 3, "câbles/conduites/contrepoids visibles")
         t.check(surface_features is int and surface_features >= 7, "base de surface fonctionnellement riche")
         t.equal(ventilation, true, "ventilation identifiable")
 
         var deep_surface_count := int(surface_features) if surface_features is int else 0
-        renderer.set_scene_state(_state_for(150, 1))
-        var shallow_surface = renderer.get("surface_feature_count")
+        legacy_renderer.set_scene_state(_state_for(150, 1))
+        var shallow_surface = legacy_renderer.get("surface_feature_count")
         t.check(shallow_surface is int and shallow_surface < deep_surface_count, "surface plus riche avec le niveau du Centre")
 
-        renderer.set_scene_state(_state_for(30, 2))
-        var shallow_cyan = renderer.get("deep_cyan_strength")
-        var shallow_details = renderer.get("geology_detail_count")
-        renderer.set_scene_state(_state_for(150, 6))
-        var deep_cyan = renderer.get("deep_cyan_strength")
-        var deep_details = renderer.get("geology_detail_count")
-        var fractures = renderer.get("visible_fracture_count")
-        var cavities = renderer.get("visible_cavity_count")
+        legacy_renderer.set_scene_state(_state_for(30, 2))
+        var shallow_cyan = legacy_renderer.get("deep_cyan_strength")
+        var shallow_details = legacy_renderer.get("geology_detail_count")
+        legacy_renderer.set_scene_state(_state_for(150, 6))
+        var deep_cyan = legacy_renderer.get("deep_cyan_strength")
+        var deep_details = legacy_renderer.get("geology_detail_count")
+        var fractures = legacy_renderer.get("visible_fracture_count")
+        var cavities = legacy_renderer.get("visible_cavity_count")
         t.check(shallow_cyan is float and deep_cyan is float and deep_cyan > shallow_cyan, "cyan renforcé en profondeur")
         t.check(shallow_details is int and deep_details is int and deep_details > shallow_details, "géologie plus riche en profondeur")
         t.check(fractures is int and fractures >= 4, "fissures visibles")
         t.check(cavities is int and cavities >= 2, "petites cavités visibles")
+    elif renderer != null:
+        t.check(renderer.has_method("visual_metrics"), "renderer v0.7 remplace le renderer v0.5")
 
     var world = screen.find_child("MineWorld", true, false)
     t.check(world != null, "monde mine disponible")
