@@ -80,4 +80,15 @@ func _check_assets() -> void:
         "crystal_module",
     ]:
         t.check(Assets.has_asset(id), "asset existe: %s" % id)
-        t.check(Assets.texture_for(id) != null, "texture charge: %s" % id)
+        var texture := Assets.texture_for(id)
+        t.check(texture != null, "texture charge: %s" % id)
+        if texture == null:
+            continue
+        var image := texture.get_image()
+        t.check(image != null and not image.is_empty(), "image lisible: %s" % id)
+        if image == null or image.is_empty():
+            continue
+        var max_x := maxi(0, image.get_width() - 1)
+        var max_y := maxi(0, image.get_height() - 1)
+        for corner in [Vector2i(0, 0), Vector2i(max_x, 0), Vector2i(0, max_y), Vector2i(max_x, max_y)]:
+            t.check(image.get_pixelv(corner).a <= 0.10, "fond transparent %s coin %s" % [id, str(corner)])
