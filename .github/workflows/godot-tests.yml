@@ -8,6 +8,7 @@ on:
       - feature/visual-v0.4
       - feature/visual-depth-v0.5
       - feature/final-graphics-v0.6
+      - feature/portrait-v0.8
       - main
   pull_request:
     branches:
