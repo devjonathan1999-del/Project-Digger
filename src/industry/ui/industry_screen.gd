@@ -239,7 +239,7 @@ func _build_camera_shortcuts(parent: Control) -> void:
 
     var camera_row := HFlowContainer.new()
     camera_row.name = "MineCameraShortcuts"
-    camera_row.custom_minimum_size = Vector2(360, 36)
+    camera_row.custom_minimum_size = Vector2(520, 36)
     camera_row.add_theme_constant_override("h_separation", 5)
     camera_row.add_theme_constant_override("v_separation", 4)
     shortcut_panel.add_child(camera_row)
