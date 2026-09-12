@@ -185,8 +185,9 @@ func _draw_crystal_installation() -> void:
     var rect := Rect2(center.x - 120.0, center.y - 54.0, 240.0, 108.0)
     draw_circle(center, 74.0, Color(0.18, 0.82, 0.84, 0.045))
     _draw_asset("crystal_module", rect)
-    for offset in [Vector2(-78.0, 24.0), Vector2(-55.0, 10.0), Vector2(78.0, 20.0)]:
-        var base := center + offset
+    for offset_value in [Vector2(-78.0, 24.0), Vector2(-55.0, 10.0), Vector2(78.0, 20.0)]:
+        var offset: Vector2 = offset_value
+        var base: Vector2 = center + offset
         draw_colored_polygon(PackedVector2Array([
             base + Vector2(-7.0, 12.0),
             base + Vector2(0.0, -18.0),
