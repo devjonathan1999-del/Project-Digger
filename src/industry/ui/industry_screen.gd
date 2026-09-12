@@ -426,7 +426,15 @@ func _responsive() -> void:
     if _compact_hud == null:
         return
     var narrow := size.x < 900
+    var portrait := size.y > size.x
     _compact_hud.columns = 5 if narrow else 10
+    if _mine_panel != null:
+        _mine_panel.custom_minimum_size.y = 860.0 if portrait else 540.0
+    if _bottom_navigation != null:
+        _bottom_navigation.custom_minimum_size.y = 52.0 if portrait else 44.0
+    for tab in _tabs.values():
+        var tab_button := tab as Button
+        tab_button.custom_minimum_size.y = 48.0 if portrait else 40.0
     if _site_panel != null:
         _site_panel.set_layout_mode("bottom_sheet" if narrow else "floating_right")
     if _alert_stack != null:
