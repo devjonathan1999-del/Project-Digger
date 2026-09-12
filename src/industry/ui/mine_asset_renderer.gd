@@ -4,6 +4,7 @@ extends "res://src/industry/ui/mine_final_module_renderer.gd"
 const V07Assets = preload("res://src/industry/ui/mine_v07_assets.gd")
 const STATION_DEPTHS: Array[int] = [30, 60, 90, 120, 150]
 const SHALLOW_RESOURCE_ASSETS: Array[String] = ["iron_installation", "coal_installation", "copper_installation"]
+const NARROW_RESOURCE_SAFE_TOP := 160.0
 
 var _session
 var _world: Control
@@ -229,18 +230,26 @@ func _resource_v07_rects(viewport_size: Vector2, depth: int, narrow: bool) -> Di
             rects["crystal_installation"] = Rect2(viewport_size.x * 0.77 - 210.0, crystal_y - 105.0, 420.0, 210.0)
     return rects
 
+func _shallow_resource_visible(target: Rect2, narrow: bool) -> bool:
+    if target.end.y < -170.0 or target.position.y > size.y + 170.0:
+        return false
+    if narrow and target.position.y < NARROW_RESOURCE_SAFE_TOP:
+        return false
+    return true
+
 func _draw_resource_installations() -> void:
     var depth := int(_state.get("depth", 0))
     var viewport_size: Vector2 = _state.get("viewport_size", size)
     if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
         viewport_size = size
-    var rects := _resource_v07_rects(viewport_size, depth, size.x < 800.0)
+    var narrow := size.x < 800.0
+    var rects := _resource_v07_rects(viewport_size, depth, narrow)
 
     for asset_id in SHALLOW_RESOURCE_ASSETS:
         if not rects.has(asset_id):
             continue
         var target: Rect2 = rects[asset_id]
-        if target.end.y < -170.0 or target.position.y > size.y + 170.0:
+        if not _shallow_resource_visible(target, narrow):
             continue
         _draw_resource_cavity(target, asset_id)
         var actual := _draw_v07_asset(asset_id, target)
