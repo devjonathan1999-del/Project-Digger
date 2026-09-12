@@ -33,6 +33,16 @@ jobs:
           if [[ $status -ne 0 ]]; then exit "$status"; fi
           if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' godot-import-v07.log; then exit 1; fi
 
+      - name: Verify v0.7 payload bytes
+        shell: bash
+        run: |
+          cat assets/industry/v07/payload/part*.b64 | tr -d '\r\n ' > /tmp/v07-atlas.b64
+          echo "base64-bytes=$(wc -c < /tmp/v07-atlas.b64)"
+          base64 -d /tmp/v07-atlas.b64 > /tmp/v07-atlas.png
+          echo "decoded-bytes=$(wc -c < /tmp/v07-atlas.png)"
+          sha256sum /tmp/v07-atlas.png
+          file /tmp/v07-atlas.png
+
       - name: Exercise asset-driven v0.7 assets
         shell: bash
         run: |
