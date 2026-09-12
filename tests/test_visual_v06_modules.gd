@@ -22,6 +22,8 @@ func _run() -> void:
         "center_level": 4,
         "animation_phase": 0.0,
         "viewport_size": Vector2(1280, 800),
+        "scroll_depth": 0.0,
+        "zoom": 1.0,
     })
     await process_frame
 
@@ -30,6 +32,23 @@ func _run() -> void:
     t.check(int(metrics.get("surface_module_count", 0)) >= 4, "modules de surface comptés")
     t.check(int(metrics.get("shaft_station_count", 0)) >= 2, "stations du puits comptées")
     t.check(int(metrics.get("resource_installation_count", 0)) >= 3, "installations de ressources comptées")
+
+    node.set_scene_state({
+        "depth": 120,
+        "center_level": 6,
+        "animation_phase": 0.0,
+        "viewport_size": Vector2(1280, 800),
+        "scroll_depth": 0.0,
+        "zoom": 1.0,
+    })
+    await process_frame
+    metrics = node.metrics()
+    t.check(float(metrics.get("shaft_width", 0.0)) >= 120.0, "puits central élargi")
+    t.check(float(metrics.get("shaft_width", 999.0)) <= 150.0, "largeur du puits bornée")
+    t.check(int(metrics.get("surface_feature_count", 0)) >= 6, "surface lisible comme base minière")
+    t.equal(bool(metrics.get("elevator_visible", false)), true, "cage ascenseur visible")
+    t.check(int(metrics.get("shaft_station_count", 0)) >= 4, "stations visibles aux horizons débloqués")
+    t.check(int(metrics.get("utility_line_count", 0)) >= 4, "câbles et conduites du puits présents")
 
     node.queue_free()
     await process_frame
