@@ -2,7 +2,7 @@ class_name MineInteractionPresenter
 extends Control
 
 const Style = preload("res://src/industry/ui/industry_theme.gd")
-const ModuleRenderer = preload("res://src/industry/ui/mine_module_renderer.gd")
+const ModuleRenderer = preload("res://src/industry/ui/mine_final_module_renderer.gd")
 
 const REST_ALPHA := 0.24
 const EMPHASIZED_ALPHA := 1.0
