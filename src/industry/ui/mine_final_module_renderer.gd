@@ -1,6 +1,9 @@
 class_name MineFinalModuleRenderer
 extends "res://src/industry/ui/mine_module_renderer.gd"
 
+const SURFACE_WIDE_MIN_GROUND_Y := 118.0
+const SURFACE_NARROW_MIN_GROUND_Y := 104.0
+
 func set_scene_state(state: Dictionary) -> void:
     super.set_scene_state(state)
     var viewport_size: Vector2 = state.get("viewport_size", size)
@@ -10,22 +13,27 @@ func set_scene_state(state: Dictionary) -> void:
     var center_level := int(state.get("center_level", 1))
     var surface_profile: Dictionary = Layout.surface_profile(center_level)
     var modules: Array = surface_profile.get("modules", [])
-    var rects := _surface_asset_rects(viewport_size.x, 0.0, modules, narrow)
+    var actual_ground_y := _depth_to_y(0.0)
+    var visual_ground_y := _surface_visual_ground_y(actual_ground_y, narrow)
+    var rects := _surface_asset_rects(viewport_size.x, visual_ground_y, modules, narrow)
     _metrics["narrow_mode"] = narrow
     _metrics["shaft_center_x"] = viewport_size.x * 0.5
     _metrics["surface_bounds_ok"] = _rects_within_width(rects, viewport_size.x)
+    _metrics["surface_vertical_bounds_ok"] = _rects_within_height(rects, viewport_size.y)
+    _metrics["surface_visual_ground_y"] = visual_ground_y
     _metrics["decorative_detail_level"] = 1 if narrow else 2
     queue_redraw()
 
 func _draw_surface_base() -> void:
-    var ground_y := _depth_to_y(0.0)
-    if ground_y < -140.0 or ground_y > size.y + 140.0:
+    var actual_ground_y := _depth_to_y(0.0)
+    if actual_ground_y < -140.0 or actual_ground_y > size.y + 140.0:
         return
 
     var center_level := int(_state.get("center_level", 1))
     var profile: Dictionary = Layout.surface_profile(center_level)
     var modules: Array = profile.get("modules", [])
     var narrow := size.x < 800.0
+    var ground_y := _surface_visual_ground_y(actual_ground_y, narrow)
     var shaft_x := size.x * 0.5
     var apron_height := 88.0 if narrow else 102.0
 
@@ -51,6 +59,12 @@ func _draw_surface_base() -> void:
     if narrow:
         light_count = mini(light_count, 5)
     _draw_surface_lights(ground_y, light_count)
+
+func _surface_visual_ground_y(actual_ground_y: float, narrow: bool) -> float:
+    if actual_ground_y < 0.0:
+        return actual_ground_y
+    var minimum_ground_y := SURFACE_NARROW_MIN_GROUND_Y if narrow else SURFACE_WIDE_MIN_GROUND_Y
+    return maxf(actual_ground_y, minimum_ground_y)
 
 func _draw_resource_installations() -> void:
     if size.x >= 800.0:
@@ -112,5 +126,12 @@ func _rects_within_width(rects: Dictionary, viewport_width: float) -> bool:
     for rect_value in rects.values():
         var rect: Rect2 = rect_value
         if rect.position.x < -0.5 or rect.end.x > viewport_width + 0.5:
+            return false
+    return true
+
+func _rects_within_height(rects: Dictionary, viewport_height: float) -> bool:
+    for rect_value in rects.values():
+        var rect: Rect2 = rect_value
+        if rect.position.y < -0.5 or rect.end.y > viewport_height + 0.5:
             return false
     return true
