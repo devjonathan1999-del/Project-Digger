@@ -221,7 +221,7 @@ func _label_for_target(target: Button) -> String:
             return "Foreuse"
     if key.begins_with("Site_"):
         return "Site d'exploitation"
-    if key.begins_with("Discovery_\"):
+    if key.begins_with("Discovery_"):
         var raw := original_text.to_lower()
         if "anomal" in raw:
             return "Anomalie"
