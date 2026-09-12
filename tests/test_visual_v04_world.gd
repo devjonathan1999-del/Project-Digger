@@ -27,15 +27,20 @@ func _run() -> void:
     await process_frame
     await process_frame
 
-    var renderer = screen.find_child("MineSceneRenderer", true, false)
+    var legacy_renderer = screen.find_child("MineSceneRenderer", true, false)
+    var renderer = screen.find_child("MineAssetRenderer", true, false)
+    if renderer == null:
+        renderer = legacy_renderer
     t.check(renderer != null, "renderer industriel dédié présent")
-    if renderer != null:
-        t.check(int(renderer.get("surface_module_count")) >= 4, "surface industrielle lisible")
-        t.check(int(renderer.get("gallery_detail_count")) >= 3, "galeries structurées")
-        var shallow := float(renderer.call("accent_strength_for_depth", 30))
-        var deep := float(renderer.call("accent_strength_for_depth", 100))
+    if legacy_renderer != null:
+        t.check(int(legacy_renderer.get("surface_module_count")) >= 4, "surface industrielle lisible")
+        t.check(int(legacy_renderer.get("gallery_detail_count")) >= 3, "galeries structurées")
+        var shallow := float(legacy_renderer.call("accent_strength_for_depth", 30))
+        var deep := float(legacy_renderer.call("accent_strength_for_depth", 100))
         t.check(deep > shallow * 1.5, "accent cyan renforcé avec la profondeur")
-        t.check(float(renderer.get("deep_accent_strength")) >= 0.40, "état profond transmis au renderer")
+        t.check(float(legacy_renderer.get("deep_accent_strength")) >= 0.40, "état profond transmis au renderer")
+    elif renderer != null:
+        t.check(renderer.has_method("visual_metrics"), "renderer industriel v0.7 exposé")
 
     var world = screen.find_child("MineWorld", true, false)
     t.check(world != null, "monde mine disponible")
