@@ -9,6 +9,7 @@ func _initialize() -> void:
     call_deferred("_run")
 
 func _run() -> void:
+    root.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
     root.size = Vector2i(1280, 800)
     DirAccess.make_dir_recursive_absolute("user://tests")
     _cleanup()
