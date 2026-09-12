@@ -4,7 +4,7 @@
 
 **Goal:** Make detailed transparent PNG installations the dominant visual language of the Mine screen while preserving gameplay, save data, progression and interaction semantics.
 
-**Architecture:** Add a dedicated `MineV07Assets` catalog and a `MineAssetRenderer` that extends the current final visual renderer. The renderer keeps procedural geology, shaft continuity, lighting and atmosphere, but replaces most machine/building primitives with authored PNG modules drawn aspect-preserving. `IndustryScreen` switches only the renderer script; `MineWorld` and `MineInteractionPresenter` remain the owners of gameplay hitboxes and context actions.
+**Architecture:** Add a dedicated `MineV07Assets` catalog and a `MineAssetRenderer` extending `mine_final_module_renderer.gd`. Because `IndustryScreen` currently expects its renderer to expose `bind(session, world)`, the v0.7 renderer also provides the small runtime bridge (`bind`, `_process`, `_sync_state`) that feeds the existing presentation state into the final renderer. `MineWorld` and `MineInteractionPresenter` remain the owners of hitboxes and context actions.
 
 **Tech Stack:** Godot 4.7.2, GDScript, `gl_compatibility`, RGBA PNG assets, GitHub Actions/Xvfb visual tests.
 
@@ -18,77 +18,42 @@
 - PNGs are visual-only and must never capture mouse input.
 - Preserve aspect ratio for every PNG; never stretch to arbitrary rectangles.
 - Procedural drawing remains for continuous geology, shaft body/cables, local connectors, lights and atmosphere only.
-- Godot version remains 4.7.2 with `gl_compatibility`.
+- Godot remains 4.7.2 with `gl_compatibility`.
 - No merge to `main` without explicit user approval.
 
 ---
 
-## File Structure
-
-### New production files
-- `assets/industry/v07/surface_workshop.png`
-- `assets/industry/v07/surface_silo.png`
-- `assets/industry/v07/surface_ventilation.png`
-- `assets/industry/v07/surface_crane.png`
-- `assets/industry/v07/shaft_station.png`
-- `assets/industry/v07/shaft_elevator.png`
-- `assets/industry/v07/iron_installation.png`
-- `assets/industry/v07/coal_installation.png`
-- `assets/industry/v07/copper_installation.png`
-- `assets/industry/v07/crystal_installation.png`
-- `src/industry/ui/mine_v07_assets.gd` — asset path authority and texture cache.
-- `src/industry/ui/mine_asset_renderer.gd` — v0.7 asset-driven presentation layer.
-
-### Modified production files
-- `src/industry/ui/industry_screen.gd` — preload `mine_asset_renderer.gd` instead of `mine_scene_renderer.gd`.
-- `src/industry/ui/mine_interaction_presenter.gd` — only if a regression requires explicit focus/mouse behavior; no semantic changes.
-
-### New tests
-- `tests/test_visual_v07_assets.gd`
-- `tests/test_visual_v07_renderer.gd`
-- `tests/test_visual_v07_captures.gd`
-
-### Modified test/CI/docs
-- `.github/workflows/godot-tests.yml`
-- `README.md`
-
----
-
-### Task 1: Import the 10 RGBA PNG assets and add the v0.7 catalog
+### Task 1: Import the 10 RGBA assets and create `MineV07Assets`
 
 **Files:**
-- Create: `assets/industry/v07/*.png` (10 files listed above)
+- Create: `assets/industry/v07/surface_workshop.png`
+- Create: `assets/industry/v07/surface_silo.png`
+- Create: `assets/industry/v07/surface_ventilation.png`
+- Create: `assets/industry/v07/surface_crane.png`
+- Create: `assets/industry/v07/shaft_station.png`
+- Create: `assets/industry/v07/shaft_elevator.png`
+- Create: `assets/industry/v07/iron_installation.png`
+- Create: `assets/industry/v07/coal_installation.png`
+- Create: `assets/industry/v07/copper_installation.png`
+- Create: `assets/industry/v07/crystal_installation.png`
 - Create: `src/industry/ui/mine_v07_assets.gd`
 - Create: `tests/test_visual_v07_assets.gd`
 - Modify: `.github/workflows/godot-tests.yml`
 
 **Interfaces:**
-- Produces: `MineV07Assets.has_asset(id: String) -> bool`
-- Produces: `MineV07Assets.texture_for(id: String) -> Texture2D`
-- Produces stable IDs: `surface_workshop`, `surface_silo`, `surface_ventilation`, `surface_crane`, `shaft_station`, `shaft_elevator`, `iron_installation`, `coal_installation`, `copper_installation`, `crystal_installation`.
+- `MineV07Assets.has_asset(id: String) -> bool`
+- `MineV07Assets.texture_for(id: String) -> Texture2D`
 
-- [ ] **Step 1: Add the failing asset test before uploading PNGs**
-
-Create `tests/test_visual_v07_assets.gd`:
+- [ ] **Step 1: Add the failing asset test**
 
 ```gdscript
 extends SceneTree
-
 const Assets = preload("res://src/industry/ui/mine_v07_assets.gd")
-
 const REQUIRED := [
-    "surface_workshop",
-    "surface_silo",
-    "surface_ventilation",
-    "surface_crane",
-    "shaft_station",
-    "shaft_elevator",
-    "iron_installation",
-    "coal_installation",
-    "copper_installation",
-    "crystal_installation",
+    "surface_workshop", "surface_silo", "surface_ventilation", "surface_crane",
+    "shaft_station", "shaft_elevator", "iron_installation", "coal_installation",
+    "copper_installation", "crystal_installation",
 ]
-
 func _init() -> void:
     var failures := 0
     for id in REQUIRED:
@@ -106,9 +71,6 @@ func _init() -> void:
             push_error("asset image empty: %s" % id)
             failures += 1
             continue
-        if image.get_width() <= 0 or image.get_height() <= 0:
-            push_error("asset dimensions invalid: %s" % id)
-            failures += 1
         var corners := [
             image.get_pixel(0, 0).a,
             image.get_pixel(image.get_width() - 1, 0).a,
@@ -116,59 +78,44 @@ func _init() -> void:
             image.get_pixel(image.get_width() - 1, image.get_height() - 1).a,
         ]
         if corners.min() > 0.08:
-            push_error("asset corner alpha is not transparent: %s" % id)
+            push_error("asset lacks transparent corner: %s" % id)
             failures += 1
     quit(1 if failures > 0 else 0)
 ```
 
-- [ ] **Step 2: Add a dedicated CI step and verify the test is red**
-
-Add after v0.6 module tests:
+- [ ] **Step 2: Add CI step and confirm red**
 
 ```yaml
       - name: Exercise asset-driven v0.7 assets
         run: xvfb-run -a godot --headless --path . -s tests/test_visual_v07_assets.gd
 ```
 
-Run CI on the branch. Expected: FAIL because `mine_v07_assets.gd` and/or v0.7 files do not exist yet; all pre-v0.7 steps stay green.
+Expected: only v0.7 asset step fails because catalog/assets are not present.
 
-- [ ] **Step 3: Upload the generated PNGs with canonical names**
+- [ ] **Step 3: Validate and upload generated files as binary blobs**
 
-Use the current generated sources:
+Source mapping:
 
 ```text
-/mnt/data/ghostwriter_images/generated/a_high_detail_clean_cut_sci_fi_industrial_buildin_1.png
-  -> assets/industry/v07/surface_workshop.png
-/mnt/data/ghostwriter_images/generated/a_clean_high_resolution_game_style_industrial_sc_2_batch_1.png
-  -> assets/industry/v07/surface_silo.png
-/mnt/data/ghostwriter_images/generated/a_detailed_high_resolution_concept_art_style_png_3_batch_2.png
-  -> assets/industry/v07/surface_ventilation.png
-/mnt/data/ghostwriter_images/generated/wide_high_detail_concept_art_style_illustration_o_4_batch_3.png
-  -> assets/industry/v07/surface_crane.png
-/mnt/data/ghostwriter_images/generated/a_detailed_crisp_photorealistic_illustrative_2d_5_batch_4.png
-  -> assets/industry/v07/shaft_station.png
-/mnt/data/ghostwriter_images/generated/a_detailed_clean_isolated_png_style_concept_asse_6_batch_5.png
-  -> assets/industry/v07/shaft_elevator.png
-/mnt/data/ghostwriter_images/generated/a_detailed_digital_illustration_game_asset_view_7_batch_6.png
-  -> assets/industry/v07/iron_installation.png
-/mnt/data/ghostwriter_images/generated/a_detailed_high_resolution_2d_digital_illustratio_8_batch_7.png
-  -> assets/industry/v07/coal_installation.png
-/mnt/data/ghostwriter_images/generated/a_detailed_high_resolution_transparent_backgroun_9_batch_8.png
-  -> assets/industry/v07/copper_installation.png
-/mnt/data/ghostwriter_images/generated/wide_horizontal_sci_fi_fantasy_game_asset_illustra_10_batch_9.png
-  -> assets/industry/v07/crystal_installation.png
+/mnt/data/ghostwriter_images/generated/a_high_detail_clean_cut_sci_fi_industrial_buildin_1.png -> surface_workshop.png
+/mnt/data/ghostwriter_images/generated/a_clean_high_resolution_game_style_industrial_sc_2_batch_1.png -> surface_silo.png
+/mnt/data/ghostwriter_images/generated/a_detailed_high_resolution_concept_art_style_png_3_batch_2.png -> surface_ventilation.png
+/mnt/data/ghostwriter_images/generated/wide_high_detail_concept_art_style_illustration_o_4_batch_3.png -> surface_crane.png
+/mnt/data/ghostwriter_images/generated/a_detailed_crisp_photorealistic_illustrative_2d_5_batch_4.png -> shaft_station.png
+/mnt/data/ghostwriter_images/generated/a_detailed_clean_isolated_png_style_concept_asse_6_batch_5.png -> shaft_elevator.png
+/mnt/data/ghostwriter_images/generated/a_detailed_digital_illustration_game_asset_view_7_batch_6.png -> iron_installation.png
+/mnt/data/ghostwriter_images/generated/a_detailed_high_resolution_2d_digital_illustratio_8_batch_7.png -> coal_installation.png
+/mnt/data/ghostwriter_images/generated/a_detailed_high_resolution_transparent_backgroun_9_batch_8.png -> copper_installation.png
+/mnt/data/ghostwriter_images/generated/wide_horizontal_sci_fi_fantasy_game_asset_illustra_10_batch_9.png -> crystal_installation.png
 ```
 
-Before upload, inspect dimensions/mode with Python/Pillow and reject any non-RGBA file or zero-sized file. Upload via Git blobs/tree/commit so binary content is preserved exactly.
+Check each with Pillow: mode must be `RGBA`, width/height > 0, alpha extrema must include 0 and >0. Upload with Git blob/tree/commit APIs so binary bytes are preserved.
 
-- [ ] **Step 4: Add the minimal asset catalog**
-
-Create `src/industry/ui/mine_v07_assets.gd`:
+- [ ] **Step 4: Add catalog implementation**
 
 ```gdscript
 class_name MineV07Assets
 extends RefCounted
-
 const PATHS := {
     "surface_workshop": "res://assets/industry/v07/surface_workshop.png",
     "surface_silo": "res://assets/industry/v07/surface_silo.png",
@@ -181,38 +128,24 @@ const PATHS := {
     "copper_installation": "res://assets/industry/v07/copper_installation.png",
     "crystal_installation": "res://assets/industry/v07/crystal_installation.png",
 }
-
-static var _texture_cache: Dictionary = {}
-
+static var _cache: Dictionary = {}
 static func has_asset(id: String) -> bool:
     return PATHS.has(id) and ResourceLoader.exists(str(PATHS[id]))
-
 static func texture_for(id: String) -> Texture2D:
-    if not has_asset(id):
-        return null
-    if _texture_cache.has(id):
-        return _texture_cache[id] as Texture2D
+    if not has_asset(id): return null
+    if _cache.has(id): return _cache[id] as Texture2D
     var texture := load(str(PATHS[id])) as Texture2D
-    if texture != null:
-        _texture_cache[id] = texture
+    if texture != null: _cache[id] = texture
     return texture
 ```
 
-No runtime white-removal or recoloring.
+- [ ] **Step 5: Run full CI and commit**
 
-- [ ] **Step 5: Run the full CI gate and commit**
-
-Expected: Godot import succeeds, v0.7 asset test passes, all previous tests pass.
-
-Commit message:
-
-```text
-feat: add v0.7 illustrated mine asset pack
-```
+Commit: `feat: add v0.7 illustrated mine asset pack`
 
 ---
 
-### Task 2: Add `MineAssetRenderer` and switch the Mine screen to it
+### Task 2: Add runtime-compatible `MineAssetRenderer` and wire it into `IndustryScreen`
 
 **Files:**
 - Create: `src/industry/ui/mine_asset_renderer.gd`
@@ -222,310 +155,196 @@ feat: add v0.7 illustrated mine asset pack
 
 **Interfaces:**
 - `MineAssetRenderer` extends `res://src/industry/ui/mine_final_module_renderer.gd`.
-- Consumes existing `set_scene_state(state: Dictionary)` contract.
-- Produces debug metrics via `visual_metrics() -> Dictionary`.
+- Must expose `bind(session, world: Control) -> void` because `IndustryScreen._build_mine_panel()` calls it.
+- Must keep `set_scene_state(state: Dictionary) -> void` for deterministic tests/captures.
+- Must expose `visual_metrics() -> Dictionary`.
 
-- [ ] **Step 1: Write the failing renderer/wiring test**
+- [ ] **Step 1: Add failing runtime bridge test**
 
-Create `tests/test_visual_v07_renderer.gd`:
+Test must instantiate `MineAssetRenderer`, call `bind(fake_session, fake_world)` using a minimal fake session/world compatible with the existing renderer state contract, then assert that calling `_process(0.0)` updates metrics without an invalid-method error. Also assert direct `set_scene_state()` still works.
+
+The deterministic state used by direct tests is:
 
 ```gdscript
-extends SceneTree
-
-const Renderer = preload("res://src/industry/ui/mine_asset_renderer.gd")
-
-func _init() -> void:
-    var renderer := Renderer.new()
-    renderer.size = Vector2(1280, 800)
-    renderer.set_scene_state({
-        "depth": 150,
-        "center_level": 6,
-        "mine_levels": {"iron": 5, "coal": 5, "copper": 5},
-        "discoveries": {},
-        "permanent_sites": [],
-        "jobs": {},
-        "scroll_depth": 55.0,
-        "zoom": 1.0,
-        "animation_phase": 0.35,
-        "viewport_size": Vector2(1280, 800),
-    })
-    var metrics := renderer.visual_metrics()
-    var failures := 0
-    if int(metrics.get("v07_major_asset_count", 0)) < 6:
-        push_error("v0.7 major assets not composed")
-        failures += 1
-    if int(metrics.get("v07_station_count", 0)) < 3:
-        push_error("v0.7 shaft stations missing")
-        failures += 1
-    if not bool(metrics.get("v07_elevator_inside_shaft", false)):
-        push_error("v0.7 elevator outside shaft")
-        failures += 1
-    if not bool(metrics.get("v07_resource_identity_ok", false)):
-        push_error("resource asset mapping incorrect")
-        failures += 1
-    quit(1 if failures > 0 else 0)
+{
+    "depth": 150,
+    "center_level": 6,
+    "mine_levels": {"iron": 5, "coal": 5, "copper": 5},
+    "discoveries": {},
+    "permanent_sites": [],
+    "jobs": {},
+    "scroll_depth": 55.0,
+    "zoom": 1.0,
+    "animation_phase": 0.35,
+    "viewport_size": Vector2(1280, 800),
+}
 ```
 
-- [ ] **Step 2: Add CI and verify red**
+Expected red: `mine_asset_renderer.gd` missing.
 
-Add:
-
-```yaml
-      - name: Exercise asset-driven v0.7 renderer
-        run: xvfb-run -a godot --headless --path . -s tests/test_visual_v07_renderer.gd
-```
-
-Expected: FAIL because `mine_asset_renderer.gd` does not exist.
-
-- [ ] **Step 3: Implement renderer shell and metrics**
-
-Create `src/industry/ui/mine_asset_renderer.gd`:
+- [ ] **Step 2: Implement runtime bridge**
 
 ```gdscript
 class_name MineAssetRenderer
 extends "res://src/industry/ui/mine_final_module_renderer.gd"
-
 const Assets = preload("res://src/industry/ui/mine_v07_assets.gd")
-
+var _session
+var _world: Control
 var _v07_metrics: Dictionary = {}
-
+func _ready() -> void:
+    name = "MineAssetRenderer"
+    mouse_filter = Control.MOUSE_FILTER_IGNORE
+    set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    set_process(true)
+func bind(session, world: Control) -> void:
+    _session = session
+    _world = world
+    _sync_state()
+func _process(_delta: float) -> void:
+    if _session != null and _world != null:
+        _sync_state()
+func _sync_state() -> void:
+    var game = _session.game
+    set_scene_state({
+        "depth": game.depth,
+        "center_level": game.center_level,
+        "mine_levels": game.mine_levels.duplicate(true),
+        "discoveries": game.discoveries.duplicate(true),
+        "permanent_sites": game.permanent_sites.duplicate(true),
+        "jobs": game.jobs.duplicate(true),
+        "scroll_depth": float(_world.get("scroll_depth")),
+        "zoom": float(_world.get("zoom")),
+        "animation_phase": float(_world.get("animation_phase")),
+        "viewport_size": size,
+    })
 func set_scene_state(state: Dictionary) -> void:
     super.set_scene_state(state)
     _update_v07_metrics()
     queue_redraw()
-
 func visual_metrics() -> Dictionary:
-    var result := _metrics.duplicate(true)
+    var result := metrics()
     result.merge(_v07_metrics, true)
     return result
-
-func _update_v07_metrics() -> void:
-    var depth := int(_state.get("depth", 0))
-    var station_count := 0
-    for horizon in [30, 60, 90, 120, 150]:
-        if horizon <= depth:
-            station_count += 1
-    _v07_metrics = {
-        "v07_major_asset_count": 4 + station_count + (1 if depth >= 90 else 0),
-        "v07_station_count": station_count,
-        "v07_elevator_inside_shaft": true,
-        "v07_resource_identity_ok": (
-            Assets.has_asset("iron_installation")
-            and Assets.has_asset("coal_installation")
-            and Assets.has_asset("copper_installation")
-        ),
-    }
 ```
+
+- [ ] **Step 3: Add initial metrics**
+
+Track `v07_major_asset_count`, `v07_station_count`, `v07_elevator_inside_shaft`, `v07_resource_identity_ok`, `v07_surface_assets_in_bounds`, `v07_asset_aspect_ok`, `v07_crystal_visible`, and `v07_resource_installation_count`.
 
 - [ ] **Step 4: Switch only the screen preload**
 
-In `src/industry/ui/industry_screen.gd`, replace:
-
-```gdscript
-const MineSceneRendererScript = preload("res://src/industry/ui/mine_scene_renderer.gd")
-```
-
-with:
+In `industry_screen.gd`:
 
 ```gdscript
 const MineSceneRendererScript = preload("res://src/industry/ui/mine_asset_renderer.gd")
 ```
 
-Do not change `_build_mine_panel()` ownership or hitbox code.
+Do not change `_mine_renderer.bind(session, _mine_world)` or world ownership.
 
-- [ ] **Step 5: Run full CI and commit**
+- [ ] **Step 5: Add CI step, run full gate, commit**
 
-Expected: import + renderer test + all legacy tests green.
-
-Commit:
-
-```text
-feat: wire asset-driven v0.7 mine renderer
-```
+Commit: `feat: wire runtime-compatible v0.7 mine renderer`
 
 ---
 
-### Task 3: Replace surface and shaft primitives with illustrated modules
+### Task 3: Make surface and shaft asset-driven
 
 **Files:**
 - Modify: `src/industry/ui/mine_asset_renderer.gd`
 - Modify: `tests/test_visual_v07_renderer.gd`
 
-**Interfaces:**
-- Add helper `_draw_v07_asset(id: String, target: Rect2) -> Rect2` that fits texture using aspect-preserving `contain` behavior and returns actual draw rect.
-- Add helper `_fit_rect(source_size: Vector2, target: Rect2) -> Rect2`.
+- [ ] **Step 1: Add red assertions**
 
-- [ ] **Step 1: Extend test with surface/shaft requirements**
+Require desktop surface assets to stay in bounds, asset aspect ratio to remain unchanged, five station assets at 150 m, and elevator draw rect inside shaft bounds.
 
-Add assertions:
-
-```gdscript
-if not bool(metrics.get("v07_surface_assets_in_bounds", false)):
-    push_error("surface assets clip viewport")
-    failures += 1
-if not bool(metrics.get("v07_asset_aspect_ok", false)):
-    push_error("asset aspect ratio not preserved")
-    failures += 1
-if int(metrics.get("v07_station_count", 0)) != 5:
-    push_error("expected five visible/depth-qualified stations at 150m")
-    failures += 1
-```
-
-Verify red before implementation.
-
-- [ ] **Step 2: Implement aspect-preserving asset draw**
-
-Use:
+- [ ] **Step 2: Add aspect-preserving helper**
 
 ```gdscript
 func _fit_rect(source_size: Vector2, target: Rect2) -> Rect2:
-    if source_size.x <= 0.0 or source_size.y <= 0.0:
-        return target
+    if source_size.x <= 0.0 or source_size.y <= 0.0: return target
     var scale_factor := minf(target.size.x / source_size.x, target.size.y / source_size.y)
     var fitted_size := source_size * scale_factor
     return Rect2(target.position + (target.size - fitted_size) * 0.5, fitted_size)
-
 func _draw_v07_asset(id: String, target: Rect2) -> Rect2:
     var texture := Assets.texture_for(id)
-    if texture == null:
-        return Rect2()
+    if texture == null: return Rect2()
     var actual := _fit_rect(texture.get_size(), target)
     draw_texture_rect(texture, actual, false)
     return actual
 ```
 
-- [ ] **Step 3: Override surface composition**
+- [ ] **Step 3: Override `_draw_surface_base()`**
 
-Override `_draw_surface_base()` so the old v0.6 asset/primitives are not duplicated. Draw only:
-- procedural ground/apron/headframe connector where needed;
-- `surface_workshop` left, target width roughly 300 px wide at 1280;
-- `surface_silo` right-center around 215 px;
-- `surface_ventilation` farther right around 190 px;
-- `surface_crane` as optional large secondary asset when `Layout.surface_profile(center_level)` includes `crane`;
-- amber local glow behind assets, not line-art duplicates.
+Wide target widths at 1280: workshop 300–330 px, silo 200–230 px, ventilation 180–210 px, crane 230–280 px when unlocked. Keep shaft center clear. Narrow mode hides crane first and preserves workshop + shaft + at least one support module at readable scale.
 
-Wide mode target centers should leave the shaft clear. Narrow mode hides crane first and uses workshop + shaft + silo/ventilation without shrinking primary assets below legible scale.
+Do not call the parent v0.6 surface-machine drawing after the v0.7 assets are drawn; retain only ground/headframe/utility primitives required for continuity.
 
-- [ ] **Step 4: Override shaft station/elevator rendering**
+- [ ] **Step 4: Override shaft stations/elevator**
 
-Keep the procedural shaft body/cables from the parent renderer, but suppress duplicate primitive station/cage drawing by overriding the corresponding v0.6 methods. At each visible horizon in `[30, 60, 90, 120, 150]`, draw `shaft_station` centered on `size.x * 0.5` and `_depth_to_y(horizon)`, sized about 320–400 px wide desktop and 230–300 px narrow. Draw `shaft_elevator` inside the shaft with x centered and y derived from `animation_phase` within the visible shaft segment.
+Retain procedural shaft body/cables. Replace station/cage primitives with `shaft_station.png` at `[30,60,90,120,150]` and `shaft_elevator.png` using `animation_phase`. Desktop station target width 320–400 px; narrow 230–300 px; elevator 65–95 px desktop and proportionally smaller narrow.
 
-- [ ] **Step 5: Run renderer + legacy interaction suites and commit**
+- [ ] **Step 5: Run CI and commit**
 
-Commit:
-
-```text
-feat: compose illustrated v0.7 surface and shaft
-```
+Commit: `feat: compose illustrated v0.7 surface and shaft`
 
 ---
 
-### Task 4: Replace shallow resource machines and deep crystal content with PNG installations
+### Task 4: Replace Fer / Charbon / Cuivre / Cristal visuals
 
 **Files:**
 - Modify: `src/industry/ui/mine_asset_renderer.gd`
 - Modify: `tests/test_visual_v07_renderer.gd`
 
-- [ ] **Step 1: Add failing identity/depth tests**
+- [ ] **Step 1: Add red shallow/deep identity tests**
 
-Use two renderer states: depth 60 and depth 150.
+At depth 60: three shallow installations visible, crystal absent. At depth 150: all four visible. Require mapping `iron_installation`, `coal_installation`, `copper_installation`, `crystal_installation` and a major asset count dominated by PNG modules rather than primitive-only metrics.
 
-Assertions:
+- [ ] **Step 2: Override `_draw_resource_installations()`**
 
-```gdscript
-if bool(shallow_metrics.get("v07_crystal_visible", false)):
-    push_error("crystal installation visible before deep unlock")
-    failures += 1
-if not bool(deep_metrics.get("v07_crystal_visible", false)):
-    push_error("crystal installation missing at deep unlock")
-    failures += 1
-if int(deep_metrics.get("v07_resource_installation_count", 0)) < 4:
-    push_error("not all deep resource installations composed")
-    failures += 1
-```
+Desktop target widths: 350–430 px for shallow resource installations where space permits. Fer left, Charbon left/near shaft without overlapping Fer, Cuivre right. Narrow widths 220–300 px and vertically stagger where needed rather than shrinking below readability.
 
-Verify red.
+- [ ] **Step 3: Add deep crystal composition**
 
-- [ ] **Step 2: Override resource installation drawing**
+Show `crystal_installation` only when `depth >= 90` or when the current state exposes an already unlocked permanent crystal site. Place it in a darker cavern with cyan local glow, target width 380–500 px desktop.
 
-At the shallow resource band, draw:
-- `iron_installation` left;
-- `coal_installation` left/near shaft with no collision with iron art;
-- `copper_installation` right.
+- [ ] **Step 4: Embed assets in geology**
 
-The PNGs may visually occupy a larger footprint than the existing hitbox rectangles. Do not change the target button IDs or action callbacks.
+Draw deterministic foreground rock silhouettes over small bottom/side portions of underground assets (roughly 10–18%, never >20%) so installations read as excavated into rock rather than pasted on top. Preserve labels/hitboxes above the renderer.
 
-Use desktop target widths around 350–430 px and narrow widths around 220–300 px, always with `_fit_rect`.
+- [ ] **Step 5: Run CI and commit**
 
-- [ ] **Step 3: Draw crystal installation only when unlocked**
-
-Treat crystal as visible when `depth >= 90` or when a permanent/deep crystal site is present in `_state`; use the stricter current game unlock signal if one is already available in the renderer state. Draw `crystal_installation` inside a darker cavern band with cyan glow, around 380–500 px wide desktop.
-
-- [ ] **Step 4: Add foreground rock embedding**
-
-After each large underground asset, draw deterministic dark rock silhouettes along 10–18% of selected bottom/side edges so modules read as installed inside excavated caverns rather than pasted over rock. Do not cover interaction labels or more than roughly 20% of the installation silhouette.
-
-- [ ] **Step 5: Run full CI and commit**
-
-Commit:
-
-```text
-feat: add illustrated v0.7 resource installations
-```
+Commit: `feat: add illustrated v0.7 resource installations`
 
 ---
 
-### Task 5: Preserve responsive interaction behavior and remove visual interference
+### Task 5: Preserve interactions and responsive behavior
 
 **Files:**
 - Modify: `tests/test_visual_v07_renderer.gd`
-- Modify: `src/industry/ui/mine_asset_renderer.gd`
-- Modify only if required by a real failing regression: `src/industry/ui/mine_interaction_presenter.gd`
+- Modify only if a demonstrated failure requires it: `src/industry/ui/mine_interaction_presenter.gd`
 
-- [ ] **Step 1: Add real-screen responsive regression**
+- [ ] **Step 1: Add actual-screen regression at 1280×800 and 720×1000**
 
-Instantiate the actual industry screen at `1280x800` and `720x1000`; assert:
-- renderer class is `MineAssetRenderer`;
-- `Mine_iron`, `Mine_coal`, `Mine_copper`, `Drill` still exist;
-- each target rect has min dimension >= 44 px on narrow screen;
-- clicking `Mine_iron` opens the same context as before;
-- closing context returns marker to rest;
-- renderer `mouse_filter == Control.MOUSE_FILTER_IGNORE`.
+Assert renderer class is `MineAssetRenderer`; `Mine_iron`, `Mine_coal`, `Mine_copper`, `Drill` still exist; narrow targets are >=44 px; click on Fer opens expected context; closing context returns marker to rest; renderer mouse filter is IGNORE.
 
-- [ ] **Step 2: Verify red only if a real regression exists**
+- [ ] **Step 2: Run red/green honestly**
 
-If the test is already green, do not alter presenter behavior. Record that no production change was needed.
+If already green, do not change production code. If red, fix only the proven issue: placement, tertiary-module hiding, mouse filter, or focus release. Never alter target IDs/callback semantics.
 
-- [ ] **Step 3: Fix only demonstrated issues**
+- [ ] **Step 3: Run all interaction/responsive suites and commit only if needed**
 
-Allowed fixes:
-- narrow placement boxes;
-- tertiary surface module omission;
-- renderer mouse filter;
-- focus release after context close if regression reproduces.
-
-Do not change target IDs, callbacks, action semantics, or game state.
-
-- [ ] **Step 4: Run all interaction and responsive suites and commit if production changed**
-
-Commit only if needed:
-
-```text
-fix: preserve v0.7 mine interactions on narrow layouts
-```
+If production changes are required, commit: `fix: preserve v0.7 mine interactions on narrow layouts`
 
 ---
 
-### Task 6: Add deterministic v0.7 captures, inspect visually, document, and run final gate
+### Task 6: Capture, inspect and final-gate v0.7
 
 **Files:**
 - Create: `tests/test_visual_v07_captures.gd`
 - Modify: `.github/workflows/godot-tests.yml`
 - Modify: `README.md`
 
-- [ ] **Step 1: Add capture script**
-
-Generate exactly:
+- [ ] **Step 1: Generate exact capture matrix**
 
 ```text
 /tmp/digger-ui/v07-wide-surface.png
@@ -535,7 +354,7 @@ Generate exactly:
 /tmp/digger-ui/v07-wide-selected.png
 ```
 
-Use deterministic fixed state dictionaries. For selected capture, programmatically select an existing mine target so the context panel and marker are visible.
+Use fixed deterministic states. The selected capture programmatically selects an existing target and leaves the context panel visible.
 
 - [ ] **Step 2: Add CI capture step**
 
@@ -544,54 +363,26 @@ Use deterministic fixed state dictionaries. For selected capture, programmatical
         run: xvfb-run -a godot --path . -s tests/test_visual_v07_captures.gd
 ```
 
-Keep the existing `/tmp/digger-ui` artifact upload.
+Keep existing `/tmp/digger-ui` artifact upload.
 
 - [ ] **Step 3: Update README**
 
-Document v0.7 as an asset-driven visual layer using detailed transparent PNG modules. Explicitly state that gameplay/economy/save are unchanged. Do not claim final Android readiness or final production art completeness.
+Document that v0.7 is an asset-driven visual layer using detailed transparent PNGs; gameplay/economy/save remain unchanged. Do not claim Android readiness or final production-art completeness.
 
-- [ ] **Step 4: Run the full exact-head CI gate**
+- [ ] **Step 4: Run exact-head full CI**
 
-Required green steps:
-- project import;
-- headless logic suite;
-- industry UI layouts;
-- progression/context actions;
-- strategic events;
-- v0.4/v0.5/v0.6 visual suites;
-- v0.7 asset test;
-- v0.7 renderer/responsive test;
-- v0.7 capture generation;
-- artifact upload.
+Required green: import, headless logic, industry UI, progression/context, events, v0.4/v0.5/v0.6 regressions, v0.7 assets, v0.7 renderer/responsive, captures, artifact upload.
 
 - [ ] **Step 5: Download and inspect all five PNGs**
 
-Reject and iterate if any of these are true:
-- line art/primitives remain visually dominant over PNGs;
-- an asset is stretched or squashed;
-- modules float without rock/structural integration;
-- Fer/Charbon/Cuivre are too small to read distinctly;
-- crystal scene lacks clear cyan/deep identity;
-- shaft station or elevator alignment is wrong;
-- surface clips at top/sides;
-- narrow view is unreadable;
-- context labels dominate art.
+Reject if line art still dominates, PNGs stretch, modules float, resources are unreadably small, crystal identity is weak, shaft alignment is wrong, surface clips, narrow view is unreadable, or labels dominate art.
 
-- [ ] **Step 6: Compare branch scope against `main`**
+- [ ] **Step 6: Scope check against `main`**
 
-Expected changed areas only:
-- `assets/industry/v07/`;
-- `src/industry/ui/` visual renderer/catalog and, only if proven necessary, interaction presenter;
-- `tests/` visual/UI tests;
-- `.github/workflows/godot-tests.yml`;
-- `README.md` and v0.7 docs.
+Only assets v0.7, visual UI renderer/catalog, proven interaction fix if any, tests/CI, README/docs may differ. No `IndustryGame`, economy, save/migration or progression files.
 
-No `IndustryGame`, save/migration, economy or progression files may be changed.
+- [ ] **Step 7: Commit final gate**
 
-- [ ] **Step 7: Commit final docs/capture gate**
+Commit: `test: validate asset-driven v0.7 showcase`
 
-```text
-test: validate asset-driven v0.7 showcase
-```
-
-After the exact-head CI is green and visual inspection passes, create a PR against `main` only if requested by the user. Do not merge without explicit approval.
+After exact-head CI and visual inspection pass, present integration options. Do not merge without explicit user approval.
