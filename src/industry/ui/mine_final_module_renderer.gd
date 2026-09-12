@@ -3,6 +3,7 @@ extends "res://src/industry/ui/mine_module_renderer.gd"
 
 const SURFACE_WIDE_MIN_GROUND_Y := 118.0
 const SURFACE_NARROW_MIN_GROUND_Y := 104.0
+const RELIEF_DEPTHS := [22.0, 45.0, 75.0, 105.0, 135.0, 165.0, 195.0]
 
 func set_scene_state(state: Dictionary) -> void:
     super.set_scene_state(state)
@@ -11,6 +12,7 @@ func set_scene_state(state: Dictionary) -> void:
         viewport_size = Vector2(1280.0, 800.0)
     var narrow := viewport_size.x < 800.0
     var center_level := int(state.get("center_level", 1))
+    var total_depth := int(state.get("depth", 0))
     var surface_profile: Dictionary = Layout.surface_profile(center_level)
     var modules: Array = surface_profile.get("modules", [])
     var actual_ground_y := _depth_to_y(0.0)
@@ -21,8 +23,95 @@ func set_scene_state(state: Dictionary) -> void:
     _metrics["surface_bounds_ok"] = _rects_within_width(rects, viewport_size.x)
     _metrics["surface_vertical_bounds_ok"] = _rects_within_height(rects, viewport_size.y)
     _metrics["surface_visual_ground_y"] = visual_ground_y
+    _metrics["rock_relief_count"] = _relief_depth_count(total_depth)
     _metrics["decorative_detail_level"] = 1 if narrow else 2
     queue_redraw()
+
+func _draw_final_geology() -> void:
+    super._draw_final_geology()
+    _draw_final_rock_relief()
+
+func _draw_final_rock_relief() -> void:
+    var total_depth := int(_state.get("depth", 0))
+    var shaft_width := float(_metrics.get("shaft_width", 120.0))
+    var shaft_left := size.x * 0.5 - shaft_width * 0.5
+    var shaft_right := size.x * 0.5 + shaft_width * 0.5
+
+    for index in range(RELIEF_DEPTHS.size()):
+        var relief_depth := float(RELIEF_DEPTHS[index])
+        if relief_depth > float(total_depth + 45):
+            continue
+        var y := _depth_to_y(relief_depth)
+        if y < -80.0 or y > size.y + 80.0:
+            continue
+
+        var wobble := float((index * 19 + total_depth) % 17) - 8.0
+        var left_start := 20.0 + float(index % 3) * 18.0
+        var left_end := minf(shaft_left - 30.0, size.x * (0.30 + float(index % 2) * 0.06))
+        var right_start := maxf(shaft_right + 30.0, size.x * (0.67 - float(index % 2) * 0.04))
+        var right_end := size.x - 20.0 - float((index + 1) % 3) * 14.0
+
+        if left_end - left_start > 90.0:
+            _draw_rock_relief_mass(left_start, left_end, y + wobble, relief_depth, index, -1)
+        if right_end - right_start > 90.0:
+            _draw_rock_relief_mass(right_start, right_end, y - wobble * 0.65, relief_depth, index, 1)
+
+func _draw_rock_relief_mass(x_start: float, x_end: float, y: float, relief_depth: float, index: int, side: int) -> void:
+    var width := x_end - x_start
+    var height := 28.0 + float((index + absi(side)) % 3) * 8.0
+    var shoulder := height * 0.42
+    var key_shift := float((index * 7 + absi(side) * 5) % 11) - 5.0
+    var points := PackedVector2Array([
+        Vector2(x_start, y + shoulder * 0.45),
+        Vector2(x_start + width * 0.14, y - shoulder * 0.55 + key_shift),
+        Vector2(x_start + width * 0.34, y - height * 0.50),
+        Vector2(x_start + width * 0.57, y - shoulder * 0.38 - key_shift * 0.5),
+        Vector2(x_start + width * 0.77, y - height * 0.34),
+        Vector2(x_end, y + shoulder * 0.10),
+        Vector2(x_end - width * 0.12, y + height * 0.50),
+        Vector2(x_start + width * 0.58, y + height * 0.42),
+        Vector2(x_start + width * 0.26, y + height * 0.54),
+        Vector2(x_start, y + shoulder * 0.45),
+    ])
+
+    var mass_color := Color("202a2d")
+    if relief_depth >= 90.0:
+        mass_color = Color("17292d")
+    draw_colored_polygon(points, mass_color)
+    draw_polyline(PackedVector2Array([points[0], points[1], points[2], points[3], points[4], points[5]]), Color(0.37, 0.40, 0.39, 0.42), 3.0, true)
+    draw_line(Vector2(x_start + width * 0.08, y + height * 0.47), Vector2(x_end - width * 0.08, y + height * 0.43), Color(0.03, 0.05, 0.055, 0.82), 5.0)
+
+    var boulder_color := Color("11191c")
+    for boulder_index in range(3):
+        var ratio := 0.24 + float(boulder_index) * 0.22
+        var radius := 8.0 + float((index + boulder_index) % 3) * 3.0
+        var boulder_y := y + height * (0.17 + float(boulder_index % 2) * 0.12)
+        draw_circle(Vector2(lerpf(x_start, x_end, ratio), boulder_y), radius, boulder_color)
+        draw_arc(Vector2(lerpf(x_start, x_end, ratio), boulder_y), radius, -2.8, -0.35, 12, Color(0.35, 0.36, 0.34, 0.28), 1.5)
+
+    var seam_color := Color(0.58, 0.34, 0.20, 0.60)
+    if relief_depth >= 90.0 and int(_state.get("depth", 0)) >= 90:
+        seam_color = Color(0.16, 0.72, 0.74, 0.58)
+    var seam_y := y - height * 0.08
+    draw_polyline(PackedVector2Array([
+        Vector2(x_start + width * 0.12, seam_y + 5.0),
+        Vector2(x_start + width * 0.32, seam_y - 3.0),
+        Vector2(x_start + width * 0.51, seam_y + 4.0),
+        Vector2(x_start + width * 0.69, seam_y - 5.0),
+        Vector2(x_start + width * 0.86, seam_y + 1.0),
+    ]), seam_color, 2.0, true)
+
+    if index % 2 == 0:
+        var brace_x := x_start + width * (0.72 if side < 0 else 0.28)
+        draw_line(Vector2(brace_x, y - height * 0.30), Vector2(brace_x, y + height * 0.34), Color("4e595b"), 3.0)
+        draw_line(Vector2(brace_x - 10.0, y - height * 0.30), Vector2(brace_x + 10.0, y - height * 0.30), Color("87583b"), 3.0)
+
+func _relief_depth_count(total_depth: int) -> int:
+    var count := 0
+    for relief_depth_value in RELIEF_DEPTHS:
+        if float(relief_depth_value) <= float(total_depth + 45):
+            count += 1
+    return count
 
 func _draw_surface_base() -> void:
     var actual_ground_y := _depth_to_y(0.0)
