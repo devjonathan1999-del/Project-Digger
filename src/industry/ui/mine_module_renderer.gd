@@ -64,7 +64,6 @@ func _draw_surface_base() -> void:
     var modules: Array = profile.get("modules", [])
     var shaft_x := size.x * 0.5
 
-    # Dense industrial apron hides the old schematic surface below this layer.
     draw_rect(Rect2(0.0, ground_y - 102.0, size.x, 102.0), Color("101a20"))
     draw_rect(Rect2(0.0, ground_y - 12.0, size.x, 12.0), Color("252a2b"))
     draw_line(Vector2(0.0, ground_y), Vector2(size.x, ground_y), Color("a16c3f"), 4.0)
@@ -116,7 +115,8 @@ func _draw_surface_utilities(ground_y: float, shaft_x: float) -> void:
     draw_line(Vector2(shaft_x + 55.0, utility_y), Vector2(size.x * 0.83, utility_y), pipe, 6.0)
     draw_line(Vector2(size.x * 0.31, utility_y), Vector2(size.x * 0.31, ground_y - 8.0), steel, 4.0)
     draw_line(Vector2(size.x * 0.69, utility_y), Vector2(size.x * 0.69, ground_y - 8.0), steel, 4.0)
-    for ratio in [0.18, 0.38, 0.62, 0.82]:
+    for ratio_value in [0.18, 0.38, 0.62, 0.82]:
+        var ratio := float(ratio_value)
         draw_circle(Vector2(size.x * ratio, utility_y), 4.0, Color("c17b43"))
 
 func _draw_surface_lights(ground_y: float, count: int) -> void:
@@ -149,7 +149,6 @@ func _draw_hero_shaft() -> void:
     var bottom := maxf(top_y, bottom_y)
     var height := maxf(1.0, bottom - top)
 
-    # Opaque structural volume makes the shaft the hero element.
     draw_rect(Rect2(center_x - half_width, top, shaft_width, height), Color("071015"))
     draw_rect(Rect2(center_x - half_width, top, 10.0, height), Color("323e43"))
     draw_rect(Rect2(center_x + half_width - 10.0, top, 10.0, height), Color("323e43"))
@@ -205,8 +204,9 @@ func _draw_elevator(center_x: float, half_width: float, top: float, bottom: floa
     var cage_rect := Rect2(center_x - cage_w * 0.5, y - 22.0, cage_w, 44.0)
     draw_rect(cage_rect, Color("46545a"))
     draw_rect(Rect2(cage_rect.position + Vector2(5.0, 5.0), cage_rect.size - Vector2(10.0, 10.0)), Color("172229"))
-    for offset in [-0.32, 0.0, 0.32]:
-        var x := center_x + cage_w * offset
+    for offset_value in [-0.32, 0.0, 0.32]:
+        var offset := float(offset_value)
+        var x: float = center_x + cage_w * offset
         draw_line(Vector2(x, cage_rect.position.y + 4.0), Vector2(x, cage_rect.end.y - 4.0), Color("708087"), 2.0)
     draw_rect(Rect2(center_x - 13.0, y - 5.0, 26.0, 8.0), Color("e19a4e"))
 
@@ -219,7 +219,6 @@ func _draw_asset(id: String, rect: Rect2) -> void:
     if texture != null:
         draw_texture_rect(texture, rect, false)
         return
-    # Simple procedural fallback keeps the renderer robust if an asset is unavailable.
     draw_rect(rect, Color("414d52"))
     draw_rect(Rect2(rect.position + Vector2(6.0, rect.size.y * 0.62), Vector2(rect.size.x - 12.0, 5.0)), Color("c47b43"))
 
