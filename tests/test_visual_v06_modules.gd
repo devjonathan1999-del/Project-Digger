@@ -32,6 +32,9 @@ func _run() -> void:
     t.check(int(metrics.get("surface_module_count", 0)) >= 4, "modules de surface comptés")
     t.check(int(metrics.get("shaft_station_count", 0)) >= 2, "stations du puits comptées")
     t.check(int(metrics.get("resource_installation_count", 0)) >= 3, "installations de ressources comptées")
+    t.check(int(metrics.get("iron_identity_score", 0)) >= 4, "identité visuelle fer")
+    t.check(int(metrics.get("coal_identity_score", 0)) >= 4, "identité visuelle charbon")
+    t.check(int(metrics.get("copper_identity_score", 0)) >= 4, "identité visuelle cuivre")
 
     node.set_scene_state({
         "depth": 120,
@@ -40,6 +43,13 @@ func _run() -> void:
         "viewport_size": Vector2(1280, 800),
         "scroll_depth": 0.0,
         "zoom": 1.0,
+        "permanent_sites": {
+            "90:site": {
+                "type": "crystal_cavern",
+                "active": true,
+                "depth": 90,
+            },
+        },
     })
     await process_frame
     metrics = node.metrics()
@@ -49,6 +59,7 @@ func _run() -> void:
     t.equal(bool(metrics.get("elevator_visible", false)), true, "cage ascenseur visible")
     t.check(int(metrics.get("shaft_station_count", 0)) >= 4, "stations visibles aux horizons débloqués")
     t.check(int(metrics.get("utility_line_count", 0)) >= 4, "câbles et conduites du puits présents")
+    t.check(int(metrics.get("crystal_identity_score", 0)) >= 3, "identité visuelle cristal profond")
 
     node.queue_free()
     await process_frame
