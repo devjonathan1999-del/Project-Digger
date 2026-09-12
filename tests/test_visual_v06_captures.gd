@@ -46,13 +46,13 @@ func _run() -> void:
 
     await _prepare_state(60, 3)
     _world.set("zoom", 0.75)
-    _world.focus_depth(60)
+    _world.focus_depth(30)
     _context.clear_selection()
     await _capture(Vector2i(1280, 800), folder.path_join("v06-wide-60m.png"))
 
     await _prepare_state(150, 6)
     _world.set("zoom", 0.75)
-    _world.focus_depth(150)
+    _world.focus_depth(120)
     _context.clear_selection()
     await _capture(Vector2i(1280, 800), folder.path_join("v06-wide-150m.png"))
 
@@ -73,7 +73,7 @@ func _run() -> void:
 
     await _prepare_state(90, 4)
     _world.set("zoom", 0.75)
-    _world.focus_depth(90)
+    _world.focus_depth(78)
     _context.clear_selection()
     await _capture(Vector2i(720, 1000), folder.path_join("v06-narrow-90m.png"))
 
