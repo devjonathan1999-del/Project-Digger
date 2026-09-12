@@ -6,6 +6,7 @@ const ModuleRenderer = preload("res://src/industry/ui/mine_module_renderer.gd")
 
 const REST_ALPHA := 0.24
 const EMPHASIZED_ALPHA := 1.0
+const MIN_TOUCH_HEIGHT := 44.0
 
 var _world: Control
 var _labels: Dictionary = {}
@@ -28,6 +29,8 @@ func bind(world: Control) -> void:
 
 func set_selected_key(key: String) -> void:
     _selected_key = key
+    if key == "":
+        _release_world_focus()
     _sync()
 
 func marker_alpha(key: String) -> float:
@@ -111,11 +114,31 @@ func _sync() -> void:
 func _style_target(target: Button) -> void:
     if not target.has_meta("presenter_original_text"):
         target.set_meta("presenter_original_text", target.text)
+    if not target.has_meta("presenter_touch_expanded"):
+        var old_height := target.size.y
+        var target_height := maxf(MIN_TOUCH_HEIGHT, old_height)
+        target.custom_minimum_size = Vector2(maxf(112.0, target.custom_minimum_size.x), maxf(MIN_TOUCH_HEIGHT, target.custom_minimum_size.y))
+        target.size = Vector2(maxf(112.0, target.size.x), target_height)
+        target.position.y -= (target_height - old_height) * 0.5
+        target.set_meta("presenter_touch_expanded", true)
     var original_text := str(target.get_meta("presenter_original_text", ""))
     target.tooltip_text = original_text
     target.text = ""
     target.modulate = Color(1.0, 1.0, 1.0, 0.035)
     target.focus_mode = Control.FOCUS_ALL
+
+func _release_world_focus() -> void:
+    if _world == null or not is_instance_valid(_world) or get_viewport() == null:
+        return
+    var focus_owner := get_viewport().gui_get_focus_owner()
+    if not focus_owner is Control:
+        return
+    var cursor: Node = focus_owner
+    while cursor != null:
+        if cursor == _world:
+            (focus_owner as Control).release_focus()
+            return
+        cursor = cursor.get_parent()
 
 func _sync_label(key: String, text: String, target: Button) -> void:
     var label: Label
