@@ -215,12 +215,15 @@ func _resource_v07_rects(viewport_size: Vector2, depth: int, narrow: bool) -> Di
     var shallow_y := _depth_to_y(12.0)
     var rects: Dictionary = {}
     if narrow:
-        rects["iron_installation"] = Rect2(8.0, shallow_y - 70.0, 220.0, 118.0)
-        rects["coal_installation"] = Rect2(38.0, shallow_y + 35.0, 230.0, 120.0)
-        rects["copper_installation"] = Rect2(viewport_size.x - 238.0, shallow_y - 25.0, 228.0, 118.0)
+        var iron_y := _depth_to_y(22.0)
+        var coal_y := _depth_to_y(50.0)
+        var copper_y := _depth_to_y(78.0)
+        rects["iron_installation"] = Rect2(10.0, iron_y - 56.0, 205.0, 112.0)
+        rects["coal_installation"] = Rect2(viewport_size.x - 215.0, coal_y - 56.0, 205.0, 112.0)
+        rects["copper_installation"] = Rect2(10.0, copper_y - 56.0, 205.0, 112.0)
         if depth >= 90:
-            var crystal_y_narrow := _depth_to_y(90.0)
-            rects["crystal_installation"] = Rect2(viewport_size.x - 305.0, crystal_y_narrow - 78.0, 290.0, 156.0)
+            var crystal_y_narrow := _depth_to_y(108.0)
+            rects["crystal_installation"] = Rect2(viewport_size.x - 248.0, crystal_y_narrow - 68.0, 238.0, 136.0)
     else:
         rects["iron_installation"] = Rect2(12.0, shallow_y - 82.0, 305.0, 162.0)
         rects["coal_installation"] = Rect2(308.0, shallow_y - 76.0, 260.0, 150.0)
