@@ -98,3 +98,23 @@ static func surface_profile(center_level: int) -> Dictionary:
         "light_count": 2 + level,
         "service_density": 0.35 + float(level - 1) * 0.10,
     }
+
+static func shaft_profile(viewport_width: float, depth: int) -> Dictionary:
+    var station_depths: Array[int] = []
+    for station_depth in [30, 60, 90, 120, 150]:
+        if station_depth <= depth:
+            station_depths.append(station_depth)
+    return {
+        "width": clampf(viewport_width * 0.115, 110.0, 150.0),
+        "station_depths": station_depths,
+        "utility_line_count": 6 if depth > 0 else 0,
+        "elevator_visible": depth > 0,
+    }
+
+static func resource_module_profile(resource_id: String, depth: int) -> Dictionary:
+    var side := -1 if resource_id in ["iron", "coal"] else 1
+    return {
+        "side": side,
+        "depth": depth,
+        "scale": 1.0,
+    }

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="195" viewBox="0 0 360 195">
+  <rect width="360" height="195" fill="none"/>
+  <g stroke="#1b252c" stroke-width="4" stroke-linejoin="round">
+    <path d="M30 62 L72 38 H255 L310 70 V160 H30 Z" fill="#2d3940"/>
+    <path d="M62 38 H260 L305 68 H95 Z" fill="#48545a"/>
+    <rect x="58" y="87" width="88" height="73" rx="3" fill="#171f24"/>
+    <rect x="162" y="82" width="116" height="78" rx="3" fill="#222d33"/>
+    <rect x="177" y="97" width="38" height="25" fill="#c78743" stroke="#805024"/>
+    <rect x="225" y="97" width="38" height="25" fill="#e4b25c" stroke="#805024"/>
+    <path d="M78 88 V160 M126 88 V160" stroke="#6f7b80"/>
+    <path d="M62 128 H143" stroke="#c7803d" stroke-width="3"/>
+    <path d="M168 136 H274" stroke="#65757c" stroke-width="3"/>
+    <path d="M182 142 H260" stroke="#d78b43" stroke-width="2"/>
+    <path d="M45 160 H315" stroke="#8c6845" stroke-width="6"/>
+    <path d="M285 76 V35 M285 35 H305" stroke="#738188"/>
+    <circle cx="305" cy="35" r="6" fill="#f0b253" stroke="#8c5c25"/>
+  </g>
+  <g fill="#e5ad58">
+    <circle cx="75" cy="78" r="5"/><circle cx="130" cy="78" r="5"/><circle cx="184" cy="76" r="5"/><circle cx="245" cy="76" r="5"/>
+  </g>
+  <g fill="#0f171b" stroke="#5f6d73" stroke-width="3">
+    <rect x="34" y="143" width="31" height="17" rx="2"/><circle cx="40" cy="162" r="6"/><circle cx="60" cy="162" r="6"/>
+    <rect x="276" y="135" width="36" height="25" rx="2"/>
+  </g>
+</svg>
