@@ -58,6 +58,10 @@ func _run() -> void:
         if tab == null or tab.custom_minimum_size.y < 48.0:
             _fail("%s must expose a portrait touch target >= 48 px" % tab_name, failures)
 
+    var camera_shortcuts := screen.find_child("MineCameraShortcuts", true, false) as HFlowContainer
+    if camera_shortcuts == null or camera_shortcuts.custom_minimum_size.x < 480.0 or camera_shortcuts.size.y > 48.0:
+        _fail("portrait depth shortcuts must stay on one compact row", failures)
+
     var page_scroll := screen.find_child("PageScroll", true, false) as ScrollContainer
     if page_scroll == null or page_scroll.get_h_scroll_bar().max_value > 721.0:
         _fail("portrait UI must not overflow horizontally", failures)
