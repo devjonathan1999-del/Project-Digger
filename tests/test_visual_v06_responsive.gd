@@ -41,6 +41,8 @@ func _run() -> void:
         t.check(float(wide.get("shaft_width", 0.0)) >= 110.0 and float(wide.get("shaft_width", 0.0)) <= 150.0, "puits borné sur desktop")
         t.check(absf(float(wide.get("shaft_center_x", -100.0)) - world.size.x * 0.5) <= 2.0, "puits centré sur desktop")
         t.equal(bool(wide.get("surface_bounds_ok", false)), true, "modules surface dans les bornes desktop")
+        t.equal(bool(wide.get("surface_vertical_bounds_ok", false)), true, "modules surface non rognés verticalement sur desktop")
+        t.check(float(wide.get("surface_visual_ground_y", 0.0)) >= 110.0, "surface desktop garde de l'air au-dessus du chevalement")
         t.check(int(wide.get("decorative_detail_level", 0)) >= 2, "niveau de détail desktop complet")
 
     for target_name in ["Mine_iron", "Mine_coal", "Mine_copper", "Drill"]:
@@ -58,6 +60,7 @@ func _run() -> void:
         t.check(float(narrow.get("shaft_width", 999.0)) <= 110.0, "puits plafonné sur mobile")
         t.check(absf(float(narrow.get("shaft_center_x", -100.0)) - world.size.x * 0.5) <= 2.0, "puits centré sur mobile")
         t.equal(bool(narrow.get("surface_bounds_ok", false)), true, "modules surface dans les bornes mobile")
+        t.equal(bool(narrow.get("surface_vertical_bounds_ok", false)), true, "modules surface non rognés verticalement sur mobile")
         t.equal(int(narrow.get("decorative_detail_level", 0)), 1, "détails tertiaires réduits sur mobile")
 
     if world != null:
